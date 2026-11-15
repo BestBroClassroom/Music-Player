@@ -8,67 +8,75 @@
 <style>
 :root{--bg:#1c1830;--sf:#272142;--ln:#3a3260;--tx:#f3effa;--mu:#a79fc4;--ac:#ffb347}
 *{box-sizing:border-box;margin:0}
-body{font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:16px}
+body{font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:20px 16px}
 button{font:inherit;cursor:pointer;border:0}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-#f{display:flex;gap:8px;max-width:960px;margin:0 auto 14px}
-#q,#key{flex:1;min-width:0;background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:10px 12px;color:var(--tx);font:inherit}
-#f button,#ks{background:var(--ac);color:#201400;border-radius:8px;padding:10px 16px;font-weight:600}
-#f .ghost{background:none;color:var(--mu);border:1px solid var(--ln);padding:10px 12px}
-#set{max-width:960px;margin:0 auto 14px;padding:12px;background:var(--sf);border-radius:10px;display:flex;flex-wrap:wrap;gap:8px}
+.app{max-width:740px;margin:auto}
+#f{display:flex;gap:8px;margin-bottom:14px}
+#q,#key{flex:1;min-width:0;background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:11px 14px;color:var(--tx);font:inherit}
+#f button,#ks{background:var(--ac);color:#201400;border-radius:10px;padding:11px 18px;font-weight:600}
+#f .ghost{background:none;color:var(--mu);border:1px solid var(--ln);padding:11px 13px}
+#set{margin-bottom:14px;padding:12px;background:var(--sf);border-radius:10px;display:flex;flex-wrap:wrap;gap:8px}
 #set small{flex-basis:100%;color:var(--mu)}
-.wrap{max-width:960px;margin:auto;display:grid;grid-template-columns:1fr 210px;gap:20px;align-items:start}
-@media(max-width:720px){.wrap{grid-template-columns:1fr}}
-#deck{background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:16px;margin-bottom:12px}
-#hero{display:flex;gap:16px;align-items:center}
-#art{width:112px;height:112px;object-fit:cover;border-radius:10px;background:var(--bg);flex:none}
-#hero small{color:var(--ac);font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:11px}
-#tt{font:700 24px/1.2 Georgia,serif;overflow-wrap:anywhere;margin:2px 0}
+
+/* Pure audio deck with 200x200 compliant player tucked behind the album cover */
+#deck{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:18px;margin-bottom:14px;display:flex;gap:20px;align-items:center}
+@media(max-width:580px){#deck{flex-direction:column;text-align:center}}
+#cover-box{position:relative;width:200px;height:200px;flex:none;border-radius:12px;overflow:hidden;background:#120f20;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+#cover-box iframe{position:absolute;inset:0;width:200px;height:200px;border:0;pointer-events:none}
+#art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;background:var(--bg)}
+#art.crop43{transform:scale(1.36)}
+.info{flex:1;min-width:0;width:100%}
+.badge{color:var(--ac);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+#tt{font:700 24px/1.2 Georgia,serif;overflow-wrap:anywhere;margin:4px 0}
 #mt{color:var(--mu);font-size:14px}
-.scrub{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:12px;color:var(--mu);font-variant-numeric:tabular-nums}
+
+.scrub{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:12px;color:var(--mu);font-variant-numeric:tabular-nums}
 .scrub input,#vol{accent-color:var(--ac);cursor:pointer}
 #seek{flex:1}
-.ctl{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.ctl{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
+@media(max-width:580px){.ctl{justify-content:center;flex-wrap:wrap}}
 .btns{display:flex;align-items:center;gap:10px}
 .btns button,#mut{width:40px;height:40px;border-radius:50%;font-size:16px;background:var(--bg);color:var(--tx)}
-#pp{width:46px;height:46px;font-size:18px;background:var(--ac)!important;color:#201400!important}
+#pp{width:48px;height:48px;font-size:18px;background:var(--ac)!important;color:#201400!important}
 .volbox{display:flex;align-items:center;gap:6px}
-#vol{width:80px}
+#vol{width:84px}
+
 #st{color:var(--mu);font-size:13px;min-height:1.3em;margin-bottom:6px}
 nav{display:flex;gap:4px;border-bottom:1px solid var(--ln);margin:8px 0}
 nav button{background:none;padding:8px 14px;color:var(--mu);border-bottom:2px solid transparent}
 nav button.on{color:var(--tx);border-color:var(--ac)}
-.row{display:flex;gap:12px;align-items:center;padding:7px;border-radius:8px;cursor:pointer}
-.row:hover{background:var(--sf)}
-.row img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:none}
+.row{display:flex;gap:12px;align-items:center;padding:8px;border-radius:10px;cursor:pointer}
+.row:hover,.row.active{background:var(--sf)}
+.row img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg)}
 .row div{min-width:0;flex:1}
 .row b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row small{color:var(--mu)}
-.msg{color:var(--mu);padding:12px 6px}
-aside{position:sticky;top:16px;text-align:center}
-#vid{width:200px;height:200px;margin:auto;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--ln)}
-#vid iframe{width:100%;height:100%;border:0}
-aside small{display:block;color:var(--mu);font-size:11px;margin-top:6px}
+.msg{color:var(--mu);padding:16px 6px}
 </style>
 </head>
 <body>
-<form id="f">
-  <input id="q" placeholder="Search a song or artist" autocomplete="off" autofocus>
-  <button>Search</button>
-  <button type="button" id="gear" class="ghost" title="Settings" aria-label="Settings">⚙</button>
-</form>
-<div id="set" hidden>
-  <input id="key" type="password" placeholder="YouTube Data API key (optional)" autocomplete="off">
-  <button id="ks">Save</button>
-  <small>Without a key, search uses public Piped servers. A free YouTube Data API key makes music search faster and steadier.</small>
-</div>
-<div class="wrap">
-  <main>
-    <div id="deck" hidden>
-      <div id="hero">
-        <img id="art" alt="">
-        <div><small>Now playing</small><h1 id="tt"></h1><p id="mt"></p></div>
-      </div>
+<div class="app">
+  <form id="f">
+    <input id="q" placeholder="Search a song or artist" autocomplete="off" autofocus>
+    <button>Search</button>
+    <button type="button" id="gear" class="ghost" title="Settings" aria-label="Settings">⚙</button>
+  </form>
+  <div id="set" hidden>
+    <input id="key" type="password" placeholder="YouTube Data API key (optional)" autocomplete="off">
+    <button id="ks">Save</button>
+    <small>Without a key, search uses public Piped servers. A free YouTube Data API key makes search faster and steadier.</small>
+  </div>
+
+  <div id="deck" hidden>
+    <div id="cover-box">
+      <div id="yt"></div>
+      <img id="art" alt="Album cover">
+    </div>
+    <div class="info">
+      <span class="badge">Now playing</span>
+      <h1 id="tt"></h1>
+      <p id="mt"></p>
       <div class="scrub">
         <span id="t0">0:00</span>
         <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
@@ -86,25 +94,49 @@ aside small{display:block;color:var(--mu);font-size:11px;margin-top:6px}
         </div>
       </div>
     </div>
-    <div id="st"></div>
-    <nav><button data-t="res" class="on">Tracks</button><button data-t="nx">Up next</button></nav>
-    <div id="ls"></div>
-  </main>
-  <aside>
-    <div id="vid"><div id="yt"></div></div>
-    <small>YouTube audio source</small>
-  </aside>
+  </div>
+
+  <div id="st"></div>
+  <nav><button data-t="res" class="on">Tracks</button><button data-t="nx">Up next</button></nav>
+  <div id="ls"></div>
 </div>
+
 <script>
 const BUILT_IN_KEY='';
 const PIPED=['https://pipedapi.kavin.rocks','https://pipedapi.leptons.xyz','https://pipedapi.nosebs.ru','https://pipedapi.adminforge.de','https://api.piped.private.coffee','https://pipedapi.orangenet.cc'];
 
 const $=s=>document.querySelector(s);
 const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
-let key=LS.get('key','')||BUILT_IN_KEY,pi=0,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},fails=0,drag=0;
+let key=LS.get('key','')||BUILT_IN_KEY,pi=0,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},fails=0,drag=0,triedExact=false;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=s=>s>=0?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'0:00';
 const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.value};
+
+/* ---- upgrade YouTube Music cover URLs to crisp 544x544 square artwork ---- */
+function bestCover(raw,id){
+  if(raw){
+    if(/=w\d+-h\d+/.test(raw))return raw.replace(/=w\d+-h\d+[^&?]*/,'=w544-h544-l90-rj');
+    if(/=s\d+/.test(raw))return raw.replace(/=s\d+[^&?]*/,'=s544');
+    if(!raw.includes('ytimg.com'))return raw;
+  }
+  return `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
+}
+function setArt(t){
+  const img=$('#art');
+  img.className='';
+  img.onerror=()=>{
+    img.onerror=null;
+    img.className='crop43';
+    img.src=`https://i.ytimg.com/vi/${t.id}/hqdefault.jpg`;
+  };
+  img.onload=()=>{
+    if(img.src.includes('maxresdefault')&&img.naturalWidth<=120){
+      img.className='crop43';
+      img.src=`https://i.ytimg.com/vi/${t.id}/hqdefault.jpg`;
+    }
+  };
+  img.src=t.thumb;
+}
 
 /* ---- clean YouTube titles into song + artist ---- */
 const JUNK=/\s*[\(\[][^\)\]]*(official|audio|lyric|video|visuali[sz]er|remaster|hd|4k)[^\)\]]*[\)\]]/ig;
@@ -115,8 +147,8 @@ function tidy(title,up){
   return{title:t,artist:a};
 }
 const vidOf=u=>(u.match(/[?&]v=([\w-]{11})/)||[])[1];
-const mk=(id,title,up,dur)=>({id,...tidy(title,up),duration:dur||null,thumb:`https://i.ytimg.com/vi/${id}/mqdefault.jpg`});
-const fromPiped=i=>mk(vidOf(i.url),i.title,i.uploaderName,i.duration);
+const mk=(id,title,up,dur,rawThumb)=>({id,...tidy(title,up),duration:dur||null,thumb:bestCover(rawThumb,id),streamId:id});
+const fromPiped=i=>mk(vidOf(i.url),i.title,i.uploaderName,i.duration,i.thumbnail);
 const isSong=i=>vidOf(i.url||'')&&(!i.duration||(i.duration>=45&&i.duration<=720));
 
 /* ---- music-focused search ---- */
@@ -137,9 +169,8 @@ async function search(q){
     u.search=new URLSearchParams({part:'snippet',q,type:'video',videoCategoryId:10,videoEmbeddable:true,maxResults:15,key});
     const r=await fetch(u),d=await r.json();
     if(!r.ok)throw Error(d.error?.message||'YouTube API error '+r.status);
-    return d.items.map(i=>mk(i.id.videoId,dec(i.snippet.title),dec(i.snippet.channelTitle)));
+    return d.items.map(i=>mk(i.id.videoId,dec(i.snippet.title),dec(i.snippet.channelTitle),null,i.snippet.thumbnails?.high?.url));
   }
-  // Query official music songs + embeddable audio uploads in parallel
   const [songsRes,audioRes]=await Promise.allSettled([
     piped('/search?q='+encodeURIComponent(q)+'&filter=music_songs'),
     piped('/search?q='+encodeURIComponent(q+' audio')+'&filter=videos')
@@ -152,8 +183,16 @@ async function search(q){
       if(t.id&&!ids.has(t.id)){ids.add(t.id);out.push(t);}
     }
   }
-  if(!out.length)throw Error('No music tracks found or search servers are busy.');
+  if(!out.length)throw Error('No music tracks found.');
   return out;
+}
+async function findExactAudio(track){
+  if(key)return null;
+  try{
+    const d=await piped('/search?q='+encodeURIComponent(`${track.artist} ${track.title} audio`)+'&filter=videos');
+    const alt=(d.items||[]).filter(isSong).map(fromPiped).find(x=>!seen.has(x.id));
+    return alt?alt.id:null;
+  }catch{return null}
 }
 async function related(t){
   if(!key){
@@ -166,7 +205,7 @@ async function related(t){
 }
 
 /* ---- UI ---- */
-const row=t=>`<div class="row" data-id="${t.id}"><img src="${t.thumb}" alt=""><div><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><small>${t.duration?fmt(t.duration):''}</small></div>`;
+const row=t=>`<div class="row${cur&&cur.id===t.id?' active':''}" data-id="${t.id}"><img src="${esc(t.thumb)}" onerror="this.src='https://i.ytimg.com/vi/${t.id}/hqdefault.jpg'" alt=""><div><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><small>${t.duration?fmt(t.duration):''}</small></div>`;
 function draw(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
   const L=tab=='res'?results:next;
@@ -175,22 +214,29 @@ function draw(){
 const meta=t=>{$('#mt').textContent=t.artist;$('#t1').textContent=fmt(t.duration||0)};
 function play(t,back){
   if(cur&&!back)hist.push(cur);
-  cur=t;seen.add(t.id);$('#st').textContent='';
-  $('#deck').hidden=false;$('#art').src=t.thumb;$('#tt').textContent=t.title;$('#t0').textContent='0:00';$('#seek').value=0;
-  meta(t);document.title=t.title+' · '+t.artist;
-  if(ready)player.loadVideoById(t.id);else pend=t;
+  cur=t;triedExact=false;seen.add(t.id);seen.add(t.streamId);$('#st').textContent='';
+  $('#deck').hidden=false;setArt(t);$('#tt').textContent=t.title;$('#t0').textContent='0:00';$('#seek').value=0;
+  meta(t);draw();document.title=t.title+' · '+t.artist;
+  if(ready)player.loadVideoById(t.streamId);else pend=t;
   if('mediaSession' in navigator)navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.artist,artwork:[{src:t.thumb}]});
   related(t).then(r=>{r.forEach(x=>lib[x.id]=x);next=r.filter(x=>!seen.has(x.id));draw()}).catch(()=>{});
 }
-const skip=(bad,code)=>{
+const skip=async bad=>{
+  // If label blocked the official Topic track, find an embeddable audio upload of this EXACT song first
+  if(bad===true&&cur&&!triedExact){
+    triedExact=true;
+    $('#st').textContent='Switching to embeddable audio source…';
+    const altId=await findExactAudio(cur);
+    if(altId){
+      cur.streamId=altId;seen.add(altId);
+      if(ready)player.loadVideoById(altId);
+      return;
+    }
+  }
   const L=bad===true?[...results,...next]:[...next,...results];
   const n=L.find(x=>!seen.has(x.id));
-  if(n){
-    play(n);
-    if(bad===true)$('#st').textContent='Label blocked embed on that version — switched to an playable audio upload.';
-  }else if(bad===true){
-    $('#st').textContent='No embeddable versions left for that search.';
-  }
+  if(n)play(n);
+  else if(bad===true)$('#st').textContent='No embeddable versions left for that search.';
 };
 
 window.onYouTubeIframeAPIReady=()=>{
@@ -201,12 +247,12 @@ window.onYouTubeIframeAPIReady=()=>{
       const ifr=player.getIframe?.();
       if(ifr)ifr.referrerPolicy='strict-origin-when-cross-origin';
       ready=1;
-      if(pend)player.loadVideoById(pend.id);
+      if(pend)player.loadVideoById(pend.streamId);
     },
     onStateChange(e){
       $('#pp').textContent=e.data==1?'⏸':'▶';
       if(e.data==1){
-        fails=0;
+        fails=0;$('#st').textContent='';
         const d=player.getDuration()|0;
         if(cur&&d){cur.duration=d;meta(cur)}
       }
@@ -214,11 +260,11 @@ window.onYouTubeIframeAPIReady=()=>{
     },
     onError(e){
       fails++;
-      if(fails>=4){
+      if(fails>=5){
         $('#st').textContent=`Playback blocked (Error ${e.data}). Run on http://localhost or HTTPS and disable Referer-blocking extensions.`;
         return;
       }
-      skip(true,e.data);
+      skip(true);
     }
   }});
 };
@@ -250,7 +296,7 @@ $('#pp').onclick=()=>ready&&(player.getPlayerState()==1?player.pauseVideo():play
 $('#nt').onclick=()=>{fails=0;skip()};
 $('#pv').onclick=()=>{if(!ready)return;if(player.getCurrentTime()>3||!hist.length)player.seekTo(0);else play(hist.pop(),true)};
 $('#gear').onclick=()=>$('#set').hidden=!$('#set').hidden;
-$('#ks').onclick=e=>{e.preventDefault();key=$('#key').value.trim()||BUILT_IN_KEY;LS.set('key',$('#key').value.trim());$('#set').hidden=true;$('#st').textContent=key?'Using your YouTube API key for music search.':'Using keyless music search.'};
+$('#ks').onclick=e=>{e.preventDefault();key=$('#key').value.trim()||BUILT_IN_KEY;LS.set('key',$('#key').value.trim());$('#set').hidden=true;$('#st').textContent=key?'Using your YouTube API key for search.':'Using keyless search.'};
 if('mediaSession' in navigator){
   navigator.mediaSession.setActionHandler('nexttrack',()=>{fails=0;skip()});
   navigator.mediaSession.setActionHandler('play',()=>player.playVideo());
