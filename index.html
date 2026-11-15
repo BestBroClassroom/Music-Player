@@ -3,372 +3,625 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="referrer" content="strict-origin-when-cross-origin">
-<title>Audio Player</title>
+<title>Audius Player</title>
 <style>
-:root{--bg:#1c1830;--sf:#272142;--ln:#3a3260;--tx:#f3effa;--mu:#a79fc4;--ac:#ffb347}
+:root{
+  --bg:#1c1830;
+  --sf:#272142;
+  --sf2:#312952;
+  --ln:#3a3260;
+  --tx:#f3effa;
+  --mu:#a79fc4;
+  --ac:#ffb347;
+  --ac-tx:#201400;
+}
 *{box-sizing:border-box;margin:0}
-body{font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:20px 16px}
-button,select{font:inherit;cursor:pointer;border:0}
+body{
+  font:15px/1.45 system-ui,-apple-system,sans-serif;
+  background:var(--bg);
+  color:var(--tx);
+  padding:20px 16px 40px;
+}
+button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-.app{max-width:820px;margin:auto}
-#f{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
-#q,#key,#chan{flex:1;min-width:180px;background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:11px 14px;color:var(--tx);font:inherit}
-#f button,#ks{background:var(--ac);color:#201400;border-radius:10px;padding:11px 18px;font-weight:600}
-#f .ghost{background:none;color:var(--mu);border:1px solid var(--ln);padding:11px 13px}
-#set{margin-bottom:14px;padding:14px;background:var(--sf);border:1px solid var(--ln);border-radius:12px;display:grid;gap:10px}
-.set-row{display:flex;gap:8px;flex-wrap:wrap}
-#set small{color:var(--mu);line-height:1.4}
+.app{max-width:780px;margin:auto}
 
-#deck{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:18px;margin-bottom:14px;display:flex;gap:20px;align-items:center}
-@media(max-width:680px){#deck{flex-direction:column;text-align:center}}
-#art{width:160px;height:160px;flex:none;border-radius:12px;object-fit:cover;background:#120f20;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+/* Search bar */
+#f{display:flex;gap:8px;margin-bottom:14px}
+#q{
+  flex:1;min-width:0;
+  background:var(--sf);
+  border:1px solid var(--ln);
+  border-radius:10px;
+  padding:11px 14px;
+  color:var(--tx);
+  font:inherit;
+}
+#q::placeholder{color:var(--mu)}
+#f button{
+  background:var(--ac);
+  color:var(--ac-tx);
+  border-radius:10px;
+  padding:11px 20px;
+  font-weight:600;
+}
+
+/* Now Playing Deck */
+#deck{
+  background:var(--sf);
+  border:1px solid var(--ln);
+  border-radius:16px;
+  padding:18px;
+  margin-bottom:14px;
+  display:flex;
+  gap:20px;
+  align-items:center;
+}
+@media(max-width:600px){
+  #deck{flex-direction:column;text-align:center}
+}
+#art{
+  width:176px;height:176px;flex:none;
+  border-radius:12px;
+  object-fit:cover;
+  background:#141024;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
 .info{flex:1;min-width:0;width:100%}
-.badge{color:var(--ac);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:11px}
-#tt{font:700 23px/1.2 Georgia,serif;overflow-wrap:anywhere;margin:4px 0}
+.topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
+@media(max-width:600px){.topline{justify-content:center}}
+.badge{
+  color:var(--ac);
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  font-size:11px;
+}
+.genre-tag{
+  font-size:11px;
+  color:var(--mu);
+  background:var(--bg);
+  padding:2px 8px;
+  border-radius:999px;
+}
+#tt{
+  font:700 24px/1.2 Georgia,serif;
+  overflow-wrap:anywhere;
+  margin:5px 0 3px;
+}
 #mt{color:var(--mu);font-size:14px}
 
-.scrub{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:12px;color:var(--mu);font-variant-numeric:tabular-nums}
-.scrub input,#vol{accent-color:var(--ac);cursor:pointer}
-#seek{flex:1}
-.ctl{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
-@media(max-width:680px){.ctl{justify-content:center;flex-wrap:wrap}}
-.btns{display:flex;align-items:center;gap:10px}
-.btns button,#mut{width:40px;height:40px;border-radius:50%;font-size:16px;background:var(--bg);color:var(--tx)}
-#pp{width:48px;height:48px;font-size:18px;background:var(--ac)!important;color:#201400!important}
+/* Scrubber */
+.scrub{
+  display:flex;align-items:center;gap:10px;
+  margin-top:16px;
+  font-size:12px;color:var(--mu);
+  font-variant-numeric:tabular-nums;
+}
+.bar-wrap{
+  position:relative;flex:1;height:18px;
+  display:flex;align-items:center;
+}
+.bar-bg,.bar-buf,.bar-fill{
+  position:absolute;left:0;height:5px;border-radius:999px;pointer-events:none;
+}
+.bar-bg{width:100%;background:var(--bg)}
+.bar-buf{width:0%;background:var(--ln)}
+.bar-fill{width:0%;background:var(--ac)}
+#seek{
+  position:relative;width:100%;margin:0;
+  background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer;
+}
+#seek::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--ac);border:2px solid var(--tx);
+}
+#seek::-moz-range-thumb{
+  width:14px;height:14px;border-radius:50%;
+  background:var(--ac);border:2px solid var(--tx);
+}
+
+/* Transport & Volume */
+.ctl{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-top:14px;
+}
+@media(max-width:600px){.ctl{justify-content:center;flex-wrap:wrap}}
+.btns{display:flex;align-items:center;gap:8px}
+.btns button,#mut{
+  width:38px;height:38px;border-radius:50%;
+  font-size:15px;background:var(--bg);color:var(--tx);
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:background .15s,color .15s;
+}
+.btns button:hover,#mut:hover{background:var(--sf2)}
+.btns button.on{color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac)}
+#pp{
+  width:48px;height:48px;font-size:18px;
+  background:var(--ac)!important;color:var(--ac-tx)!important;
+}
 .volbox{display:flex;align-items:center;gap:6px}
-#vol{width:84px}
+#vol{width:84px;accent-color:var(--ac);cursor:pointer}
 
-/* Compliant visible 200x200 YouTube frame (only shown when playing a YouTube source) */
-#yt-wrap{width:200px;height:200px;flex:none;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--ln)}
-#yt-wrap[hidden]{display:none}
-#yt-wrap iframe{width:200px;height:200px;border:0}
+/* Tabs & Genre Pills */
+#st{color:var(--mu);font-size:13px;min-height:1.3em;margin-bottom:6px}
+.toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;flex-wrap:wrap;
+  border-bottom:1px solid var(--ln);
+  margin-bottom:10px;padding-bottom:6px;
+}
+nav{display:flex;gap:4px}
+nav button{
+  padding:6px 12px;color:var(--mu);
+  border-bottom:2px solid transparent;font-weight:600;
+}
+nav button.on{color:var(--tx);border-color:var(--ac)}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pill{
+  font-size:12px;padding:5px 11px;border-radius:999px;
+  background:var(--sf);color:var(--mu);border:1px solid var(--ln);
+}
+.pill:hover{color:var(--tx)}
+.pill.on{background:var(--ac);color:var(--ac-tx);border-color:var(--ac);font-weight:600}
 
-#st{color:var(--mu);font-size:13px;min-height:1.3em;margin-bottom:8px}
-.row{display:flex;gap:12px;align-items:center;padding:8px;border-radius:10px;cursor:pointer}
+/* Track Rows */
+.row{
+  display:flex;gap:12px;align-items:center;
+  padding:8px 10px;border-radius:10px;cursor:pointer;
+  transition:background .12s;
+}
 .row:hover,.row.active{background:var(--sf)}
-.row img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg)}
-.row div{min-width:0;flex:1}
-.row b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.row small{color:var(--mu)}
-.msg{color:var(--mu);padding:16px 6px}
+.row.active b{color:var(--ac)}
+.row img{
+  width:48px;height:48px;object-fit:cover;
+  border-radius:8px;flex:none;background:#141024;
+}
+.row .meta{min-width:0;flex:1}
+.row b{
+  display:block;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.row small{color:var(--mu);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .dur{color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;flex:none}
+.verified{color:var(--ac);font-size:12px;margin-left:3px}
+.msg{color:var(--mu);padding:20px 6px;text-align:center}
 </style>
 </head>
 <body>
 <div class="app">
   <form id="f">
-    <input id="q" placeholder="Search a song or artist…" autocomplete="off" autofocus>
+    <input id="q" placeholder="Search tracks or artists on Audius…" autocomplete="off" autofocus>
     <button type="submit">Search</button>
-    <button type="button" id="gear" class="ghost" title="Source Settings" aria-label="Source Settings">⚙</button>
   </form>
-
-  <div id="set" hidden>
-    <div class="set-row">
-      <input id="key" type="password" placeholder="YouTube Data API v3 key (leave blank for keyless Audius audio)" autocomplete="off">
-      <select id="chan" aria-label="YouTube Channel Filter">
-        <option value="lyric_query">YouTube: Lyric & Audio Uploads (Recommended)</option>
-        <option value="UCNqFDjYTexJdet3rPDrmJKg">Channel: 7clouds (Lyric Videos)</option>
-        <option value="UC-9-kyTW8ZkZNDHQJ6FgpwQ">Channel: Music Topic / General</option>
-        <option value="all">YouTube: All Embeddable Videos</option>
-      </select>
-      <button type="button" id="ks">Save</button>
-    </div>
-    <small>
-      • <b>No API key:</b> Searches and plays direct audio streams from <b>Audius</b> (native &lt;audio&gt;, zero iframe errors).<br>
-      • <b>With a YouTube Data API v3 key:</b> Searches embeddable lyric uploads or a specific lyric channel and plays via a compliant visible 200×200 player.
-    </small>
-  </div>
 
   <div id="deck" hidden>
     <img id="art" alt="Cover art">
     <div class="info">
-      <span class="badge" id="badge">Now playing</span>
+      <div class="topline">
+        <span class="badge" id="badge">Now playing</span>
+        <span class="genre-tag" id="genre" hidden></span>
+      </div>
       <h1 id="tt"></h1>
       <p id="mt"></p>
+
       <div class="scrub">
         <span id="t0">0:00</span>
-        <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+        <div class="bar-wrap">
+          <div class="bar-bg"></div>
+          <div class="bar-buf" id="buf"></div>
+          <div class="bar-fill" id="fill"></div>
+          <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+        </div>
         <span id="t1">0:00</span>
       </div>
+
       <div class="ctl">
         <div class="btns">
-          <button id="pv" aria-label="Previous">⏮</button>
-          <button id="pp" aria-label="Play or pause">▶</button>
-          <button id="nt" aria-label="Next">⏭</button>
+          <button id="shuf" title="Shuffle" aria-label="Toggle shuffle">🔀</button>
+          <button id="pv" title="Previous" aria-label="Previous">⏮</button>
+          <button id="pp" title="Play or pause" aria-label="Play or pause">▶</button>
+          <button id="nt" title="Next" aria-label="Next">⏭</button>
+          <button id="rep" title="Repeat: Off" aria-label="Cycle repeat mode">🔁</button>
         </div>
         <div class="volbox">
-          <button id="mut" aria-label="Mute or unmute">🔊</button>
+          <button id="mut" title="Mute" aria-label="Mute or unmute">🔊</button>
           <input id="vol" type="range" min="0" max="100" value="100" aria-label="Volume">
         </div>
       </div>
     </div>
-    <div id="yt-wrap" hidden><div id="yt"></div></div>
   </div>
 
   <div id="st"></div>
+
+  <div class="toolbar">
+    <nav>
+      <button type="button" data-tab="trend" class="on">Trending</button>
+      <button type="button" data-tab="search">Results</button>
+    </nav>
+  </div>
+
+  <div class="pills" id="genres"></div>
   <div id="ls"></div>
 </div>
 
 <audio id="aud" preload="auto"></audio>
 
 <script>
+const APP_NAME='AudiusNativePlayer';
+const GENRES=['All','Electronic','Hip-Hop/Rap','Pop','Rock','Lo-Fi','R&B/Soul','House'];
+
 const $=s=>document.querySelector(s);
-const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
+const LS={
+  get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},
+  set(k,v){try{localStorage.setItem(k,v)}catch{}}
+};
 
-let ytKey=LS.get('yt_key','');
-let ytChan=LS.get('yt_chan','lyric_query');
-$('#key').value=ytKey;
-$('#chan').value=ytChan;
-
-let audiusHost='https://discoveryprovider.audius.co';
-let ytPlayer=null,ytReady=0,ytPending=null;
-let tracks=[],idx=-1,drag=0,activeEngine='audius';
+let hosts=['https://api.audius.co'];
+let hostIdx=0;
+let tab='trend';
+let activeGenre='All';
+let trendTracks=[];
+let searchTracks=[];
+let queue=[];
+let idx=-1;
+let drag=false;
+let shuffle=false;
+let repeat=0; // 0 = off, 1 = repeat all, 2 = repeat one
+let streamRetries=0;
 
 const aud=$('#aud');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const fmt=s=>s>=0?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'0:00';
-const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.value};
+const fmt=s=>Number.isFinite(s)&&s>=0?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'0:00';
+const fmtPlays=n=>!n?'':n>=1e6?(n/1e6).toFixed(1)+'M plays':n>=1e3?(n/1e3).toFixed(1)+'K plays':n+' plays';
 
-/* ---- Discover fastest healthy Audius node ---- */
-(async()=>{
+/* ---- Generate crisp fallback cover art if a track has no artwork ---- */
+function fallbackArt(title,artist){
+  const label=(title||'?').trim().slice(0,2).toUpperCase();
+  let hash=0;
+  for(const ch of (title+artist))hash=(hash*31+ch.charCodeAt(0))|0;
+  const hue=Math.abs(hash)%360;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="hsl(${hue},55%,28%)"/>
+      <stop offset="100%" stop-color="hsl(${(hue+45)%360},60%,16%)"/>
+    </linearGradient></defs>
+    <rect width="480" height="480" fill="url(#g)"/>
+    <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle"
+      fill="#f3effa" font-family="Georgia,serif" font-size="140" font-weight="700">${esc(label)}</text>
+  </svg>`;
+  return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+}
+
+/* ---- Discover healthy Audius discovery nodes in background ---- */
+(async function discoverHosts(){
   try{
-    const r=await fetch('https://api.audius.co',{signal:AbortSignal.timeout(4000)});
+    const r=await fetch('https://api.audius.co',{signal:AbortSignal.timeout(5000)});
+    if(!r.ok)return;
     const d=await r.json();
-    if(Array.isArray(d.data)&&d.data[0])audiusHost=d.data[0];
+    if(Array.isArray(d.data)&&d.data.length){
+      hosts=[...new Set(['https://api.audius.co',...d.data])];
+    }
   }catch{}
 })();
 
-/* ---- Search Providers (Single direct API call, zero retry loops) ---- */
-async function searchAudius(q){
-  const u=`${audiusHost}/v1/tracks/search?query=${encodeURIComponent(q)}&limit=20&app_name=WebAudioPlayer`;
-  const r=await fetch(u,{signal:AbortSignal.timeout(8000)});
-  if(!r.ok)throw Error('Audius search error '+r.status);
-  const d=await r.json();
-  return (d.data||[]).filter(t=>t.is_streamable!==false).map(t=>({
-    engine:'audius',
-    id:t.id,
-    title:t.title,
-    artist:t.user?.name||'Unknown Artist',
-    duration:t.duration||0,
-    thumb:t.artwork?.['480x480']||t.artwork?.['150x150']||'',
-    streamUrl:`${audiusHost}/v1/tracks/${t.id}/stream?app_name=WebAudioPlayer`
-  }));
-}
-
-async function searchYouTube(q){
-  const params={
-    part:'snippet',
-    type:'video',
-    videoEmbeddable:'true',
-    maxResults:'20',
-    key:ytKey
-  };
-  if(ytChan==='lyric_query'){
-    params.q=`${q} lyrics`;
-  }else if(ytChan==='all'){
-    params.q=q;
-    params.videoCategoryId='10';
-  }else{
-    params.q=q;
-    params.channelId=ytChan;
+/* ---- Fetch JSON with automatic node failover ---- */
+async function audiusGet(path){
+  let lastErr;
+  for(let attempt=0;attempt<Math.min(hosts.length,4);attempt++){
+    const base=hosts[(hostIdx+attempt)%hosts.length];
+    const sep=path.includes('?')?'&':'?';
+    try{
+      const r=await fetch(`${base}${path}${sep}app_name=${APP_NAME}`,{
+        signal:AbortSignal.timeout(8000)
+      });
+      if(!r.ok)throw Error(`HTTP ${r.status}`);
+      const json=await r.json();
+      hostIdx=(hostIdx+attempt)%hosts.length;
+      return json.data||[];
+    }catch(err){
+      lastErr=err;
+    }
   }
-  const u=new URL('https://www.googleapis.com/youtube/v3/search');
-  u.search=new URLSearchParams(params);
-  const r=await fetch(u,{signal:AbortSignal.timeout(8000)});
-  const d=await r.json();
-  if(!r.ok)throw Error(d.error?.message||'YouTube API error '+r.status);
-  return (d.items||[]).map(i=>({
-    engine:'youtube',
-    id:i.id.videoId,
-    title:dec(i.snippet.title),
-    artist:dec(i.snippet.channelTitle),
-    duration:0,
-    thumb:i.snippet.thumbnails?.high?.url||`https://i.ytimg.com/vi/${i.id.videoId}/hqdefault.jpg`
-  }));
+  throw lastErr||Error('Could not reach Audius.');
 }
 
-/* ---- UI Rendering ---- */
+function mapTrack(t){
+  const title=t.title||'Untitled';
+  const artist=t.user?.name||'Unknown Artist';
+  const fb=fallbackArt(title,artist);
+  return{
+    id:t.id,
+    title,
+    artist,
+    verified:Boolean(t.user?.is_verified),
+    genre:t.genre||'',
+    plays:t.play_count||0,
+    duration:t.duration||0,
+    thumbSm:t.artwork?.['150x150']||t.artwork?.['480x480']||fb,
+    thumbLg:t.artwork?.['480x480']||t.artwork?.['1000x1000']||t.artwork?.['150x150']||fb,
+    fallback:fb
+  };
+}
+
+const isPlayable=t=>t&&t.id&&t.is_streamable!==false&&!t.is_stream_gated;
+const streamUrlFor=(id,hIndex=hostIdx)=>`${hosts[hIndex%hosts.length]}/v1/tracks/${encodeURIComponent(id)}/stream?app_name=${APP_NAME}`;
+
+/* ---- Trending & Search ---- */
+async function loadTrending(genre='All'){
+  activeGenre=genre;
+  renderGenres();
+  $('#st').textContent=genre==='All'?'Loading trending tracks…':`Loading trending ${genre}…`;
+  try{
+    const q=genre==='All'?'/v1/tracks/trending?limit=25':`/v1/tracks/trending?genre=${encodeURIComponent(genre)}&limit=25`;
+    const raw=await audiusGet(q);
+    trendTracks=raw.filter(isPlayable).map(mapTrack);
+    if(tab==='trend'){
+      queue=trendTracks;
+      renderList();
+    }
+    $('#st').textContent=trendTracks.length?'':'No trending tracks found.';
+  }catch(err){
+    $('#st').textContent='Failed to load trending tracks: '+err.message;
+  }
+}
+
+async function runSearch(query){
+  tab='search';
+  renderTabs();
+  renderGenres();
+  $('#st').textContent='Searching Audius…';
+  try{
+    const raw=await audiusGet(`/v1/tracks/search?query=${encodeURIComponent(query)}&limit=25`);
+    searchTracks=raw.filter(isPlayable).map(mapTrack);
+    queue=searchTracks;
+    renderList();
+    $('#st').textContent=searchTracks.length?'':`No tracks found for "${query}".`;
+    if(searchTracks.length)playTrack(0);
+  }catch(err){
+    $('#st').textContent='Search error: '+err.message;
+  }
+}
+
+/* ---- Rendering ---- */
+function renderTabs(){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+}
+
+function renderGenres(){
+  const box=$('#genres');
+  box.hidden=tab!=='trend';
+  box.innerHTML=GENRES.map(g=>`<button type="button" class="pill${g===activeGenre?' on':''}" data-g="${esc(g)}">${esc(g)}</button>`).join('');
+}
+
 function renderList(){
-  if(!tracks.length){
-    $('#ls').innerHTML='<p class="msg">Search a song or artist above to start listening.</p>';
+  const list=tab==='trend'?trendTracks:searchTracks;
+  const currentId=queue[idx]?.id;
+  if(!list.length){
+    $('#ls').innerHTML=`<p class="msg">${tab==='trend'?'No tracks available.':'Search a song or artist above.'}</p>`;
     return;
   }
-  $('#ls').innerHTML=tracks.map((t,i)=>`
-    <div class="row${i===idx?' active':''}" data-i="${i}">
-      <img src="${esc(t.thumb)}" alt="">
-      <div><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div>
-      <small>${t.duration?fmt(t.duration):''}</small>
+  $('#ls').innerHTML=list.map((t,i)=>`
+    <div class="row${t.id===currentId?' active':''}" data-i="${i}">
+      <img src="${esc(t.thumbSm)}" onerror="this.onerror=null;this.src='${esc(t.fallback)}'" alt="">
+      <div class="meta">
+        <b>${esc(t.title)}</b>
+        <small>${esc(t.artist)}${t.verified?'<span class="verified" title="Verified artist">✓</span>':''}${t.plays?' · '+fmtPlays(t.plays):''}</small>
+      </div>
+      <span class="dur">${fmt(t.duration)}</span>
     </div>
   `).join('');
 }
 
-function stopAll(){
-  aud.pause();
-  aud.removeAttribute('src');
-  if(ytReady&&ytPlayer?.stopVideo)ytPlayer.stopVideo();
+/* ---- Native <audio> Playback ---- */
+function updateProgressUI(cur,dur){
+  const pct=dur>0?Math.min(100,Math.max(0,(cur/dur)*100)):0;
+  $('#fill').style.width=pct+'%';
+  if(!drag)$('#seek').value=Math.round(pct*10);
+  $('#t0').textContent=fmt(cur);
+  $('#t1').textContent=fmt(dur);
 }
 
-function playAt(i){
-  if(i<0||i>=tracks.length)return;
+function playTrack(i){
+  const list=tab==='trend'?trendTracks:searchTracks;
+  queue=list;
+  if(i<0||i>=queue.length)return;
   idx=i;
-  const t=tracks[i];
-  activeEngine=t.engine;
-  stopAll();
+  streamRetries=0;
+  const t=queue[idx];
 
   $('#deck').hidden=false;
-  $('#art').src=t.thumb||'';
+  const art=$('#art');
+  art.onerror=()=>{art.onerror=null;art.src=t.fallback;};
+  art.src=t.thumbLg;
+
   $('#tt').textContent=t.title;
-  $('#mt').textContent=t.artist;
-  $('#t0').textContent='0:00';
-  $('#t1').textContent=fmt(t.duration||0);
-  $('#seek').value=0;
+  $('#mt').innerHTML=`${esc(t.artist)}${t.verified?'<span class="verified">✓</span>':''}`;
+  if(t.genre){$('#genre').textContent=t.genre;$('#genre').hidden=false;}
+  else{$('#genre').hidden=true;}
+
+  $('#buf').style.width='0%';
+  updateProgressUI(0,t.duration);
+  $('#badge').textContent='Loading audio…';
   $('#st').textContent='';
+  document.title=`${t.title} · ${t.artist}`;
   renderList();
 
-  if(t.engine==='audius'){
-    $('#yt-wrap').hidden=true;
-    $('#badge').textContent='Audius Stream';
-    aud.src=t.streamUrl;
-    aud.volume=+$('#vol').value/100;
-    aud.play().catch(()=>{ $('#badge').textContent='Press ▶ to play'; });
+  if('mediaSession' in navigator){
+    navigator.mediaSession.metadata=new MediaMetadata({
+      title:t.title,
+      artist:t.artist,
+      artwork:[{src:t.thumbLg}]
+    });
+  }
+
+  aud.src=streamUrlFor(t.id,hostIdx);
+  aud.load();
+  aud.play().catch(()=>{
+    $('#badge').textContent='Press ▶ to play';
+  });
+}
+
+function nextTrack(auto=false){
+  if(!queue.length)return;
+  if(auto&&repeat===2){
+    aud.currentTime=0;
+    aud.play();
+    return;
+  }
+  if(shuffle&&queue.length>1){
+    let r=idx;
+    while(r===idx)r=Math.floor(Math.random()*queue.length);
+    playTrack(r);
+    return;
+  }
+  if(idx+1<queue.length){
+    playTrack(idx+1);
+  }else if(repeat===1){
+    playTrack(0);
   }else{
-    $('#yt-wrap').hidden=false;
-    $('#badge').textContent='YouTube Embed';
-    if(ytReady){
-      ytPlayer.loadVideoById(t.id);
-      ytPlayer.setVolume(+$('#vol').value);
-      ytPlayer.playVideo();
-    }else{
-      ytPending=t.id;
-    }
+    $('#pp').textContent='▶';
+    $('#badge').textContent='Finished';
   }
 }
 
-/* ---- Native HTML5 <audio> Events ---- */
-aud.onplay=()=>{ $('#pp').textContent='⏸'; $('#badge').textContent='Now playing'; };
-aud.onpause=()=>{ $('#pp').textContent='▶'; if(!aud.ended)$('#badge').textContent='Paused'; };
-aud.onended=()=>{ if(idx+1<tracks.length)playAt(idx+1); };
-aud.onerror=()=>{ $('#st').textContent='This stream failed to load. Click another track.'; };
-aud.ontimeupdate=()=>{
-  if(activeEngine!=='audius'||drag||!aud.duration)return;
-  $('#seek').value=Math.round((aud.currentTime/aud.duration)*1000);
-  $('#t0').textContent=fmt(aud.currentTime);
-  $('#t1').textContent=fmt(aud.duration);
+function prevTrack(){
+  if(!queue.length)return;
+  if(aud.currentTime>3){
+    aud.currentTime=0;
+    return;
+  }
+  if(idx>0)playTrack(idx-1);
+  else if(repeat===1)playTrack(queue.length-1);
+  else aud.currentTime=0;
+}
+
+/* ---- Audio Element Events ---- */
+aud.addEventListener('playing',()=>{
+  streamRetries=0;
+  $('#pp').textContent='⏸';
+  $('#badge').textContent='Now playing';
+});
+aud.addEventListener('pause',()=>{
+  $('#pp').textContent='▶';
+  if(!aud.ended)$('#badge').textContent='Paused';
+});
+aud.addEventListener('waiting',()=>{
+  $('#badge').textContent='Buffering…';
+});
+aud.addEventListener('ended',()=>nextTrack(true));
+aud.addEventListener('timeupdate',()=>{
+  if(drag)return;
+  const dur=Number.isFinite(aud.duration)?aud.duration:(queue[idx]?.duration||0);
+  updateProgressUI(aud.currentTime||0,dur);
+});
+aud.addEventListener('progress',()=>{
+  const dur=aud.duration;
+  if(dur>0&&aud.buffered.length){
+    const end=aud.buffered.end(aud.buffered.length-1);
+    $('#buf').style.width=Math.min(100,(end/dur)*100)+'%';
+  }
+});
+aud.addEventListener('error',()=>{
+  const t=queue[idx];
+  if(!t)return;
+  // Retry on a backup discovery node before giving up
+  if(streamRetries<Math.min(hosts.length-1,2)){
+    streamRetries++;
+    const nextHost=(hostIdx+streamRetries)%hosts.length;
+    $('#badge').textContent='Switching node…';
+    aud.src=streamUrlFor(t.id,nextHost);
+    aud.play().catch(()=>{});
+    return;
+  }
+  $('#badge').textContent='Stream error';
+  $('#st').textContent=`Could not stream "${t.title}". Try another track.`;
+});
+
+/* ---- Controls & Keyboard Shortcuts ---- */
+$('#pp').onclick=()=>aud.paused?aud.play():aud.pause();
+$('#nt').onclick=()=>nextTrack(false);
+$('#pv').onclick=()=>prevTrack();
+
+$('#shuf').onclick=()=>{
+  shuffle=!shuffle;
+  $('#shuf').classList.toggle('on',shuffle);
+};
+$('#rep').onclick=()=>{
+  repeat=(repeat+1)%3;
+  const btn=$('#rep');
+  btn.classList.toggle('on',repeat>0);
+  btn.textContent=repeat===2?'🔂':'🔁';
+  btn.title=repeat===0?'Repeat: Off':repeat===1?'Repeat: All':'Repeat: One';
 };
 
-/* ---- Official YouTube IFrame API (Compliant visible 200x200 player) ---- */
-window.onYouTubeIframeAPIReady=()=>{
-  const pv={autoplay:1,playsinline:1,rel:0,enablejsapi:1};
-  if(location.origin.startsWith('http'))pv.origin=location.origin;
-  ytPlayer=new YT.Player('yt',{width:'200',height:'200',playerVars:pv,events:{
-    onReady(){
-      const ifr=ytPlayer.getIframe?.();
-      if(ifr)ifr.referrerPolicy='strict-origin-when-cross-origin';
-      ytReady=1;
-      if(ytPending){ytPlayer.loadVideoById(ytPending);ytPending=null;}
-    },
-    onStateChange(e){
-      if(activeEngine!=='youtube')return;
-      $('#pp').textContent=e.data===1?'⏸':'▶';
-      if(e.data===1){
-        $('#badge').textContent='Now playing';
-        const d=ytPlayer.getDuration()|0;
-        if(d&&tracks[idx]){tracks[idx].duration=d;$('#t1').textContent=fmt(d);renderList();}
-      }else if(e.data===2){
-        $('#badge').textContent='Paused';
-      }else if(e.data===0&&idx+1<tracks.length){
-        playAt(idx+1);
-      }
-    },
-    onError(e){
-      // Single clean notice—no infinite search or skip loop
-      $('#badge').textContent='Embed disabled';
-      $('#st').textContent=`Uploader disabled embedding on this video (Error ${e.data}). Pick another result below.`;
-    }
-  }});
-};
-const ys=document.createElement('script');
-ys.src='https://www.youtube.com/iframe_api';
-document.head.append(ys);
-
-setInterval(()=>{
-  if(activeEngine!=='youtube'||!ytReady||drag||ytPlayer.getPlayerState?.()!==1)return;
-  const c=ytPlayer.getCurrentTime()||0,d=ytPlayer.getDuration()||0;
-  if(d>0){$('#seek').value=Math.round((c/d)*1000);$('#t0').textContent=fmt(c);$('#t1').textContent=fmt(d);}
-},300);
-
-/* ---- Transport, Scrubber & Volume ---- */
 $('#seek').oninput=()=>{
-  drag=1;
-  const d=activeEngine==='audius'?(aud.duration||0):(ytReady?ytPlayer.getDuration()||0:0);
-  $('#t0').textContent=fmt(($('#seek').value/1000)*d);
+  drag=true;
+  const dur=Number.isFinite(aud.duration)?aud.duration:(queue[idx]?.duration||0);
+  const target=(+$('#seek').value/1000)*dur;
+  $('#fill').style.width=(+$('#seek').value/10)+'%';
+  $('#t0').textContent=fmt(target);
 };
 $('#seek').onchange=()=>{
-  const pct=$('#seek').value/1000;
-  if(activeEngine==='audius'&&aud.duration)aud.currentTime=pct*aud.duration;
-  else if(activeEngine==='youtube'&&ytReady)ytPlayer.seekTo(pct*(ytPlayer.getDuration()||0),true);
-  drag=0;
+  const dur=Number.isFinite(aud.duration)?aud.duration:0;
+  if(dur>0)aud.currentTime=(+$('#seek').value/1000)*dur;
+  drag=false;
 };
-$('#pp').onclick=()=>{
-  if(activeEngine==='audius'){
-    aud.paused?aud.play():aud.pause();
-  }else if(ytReady){
-    ytPlayer.getPlayerState()===1?ytPlayer.pauseVideo():ytPlayer.playVideo();
-  }
-};
-$('#pv').onclick=()=>{
-  if(activeEngine==='audius'&&aud.currentTime>3){aud.currentTime=0;return;}
-  if(activeEngine==='youtube'&&ytReady&&ytPlayer.getCurrentTime()>3){ytPlayer.seekTo(0);return;}
-  if(idx>0)playAt(idx-1);
-};
-$('#nt').onclick=()=>{ if(idx+1<tracks.length)playAt(idx+1); };
+
+/* Restore saved volume */
+const savedVol=Math.min(100,Math.max(0,+LS.get('vol',100)));
+$('#vol').value=savedVol;
+aud.volume=savedVol/100;
+$('#mut').textContent=savedVol===0?'🔇':'🔊';
+
 $('#vol').oninput=()=>{
   const v=+$('#vol').value;
-  aud.volume=v/100;aud.muted=v===0;
-  if(ytReady){ytPlayer.unMute();ytPlayer.setVolume(v);}
+  aud.muted=false;
+  aud.volume=v/100;
+  LS.set('vol',v);
   $('#mut').textContent=v===0?'🔇':'🔊';
 };
 $('#mut').onclick=()=>{
-  if(activeEngine==='audius'){
-    aud.muted=!aud.muted;
-    $('#mut').textContent=aud.muted?'🔇':'🔊';
-  }else if(ytReady){
-    if(ytPlayer.isMuted()){ytPlayer.unMute();$('#mut').textContent='🔊';}
-    else{ytPlayer.mute();$('#mut').textContent='🔇';}
-  }
+  aud.muted=!aud.muted;
+  $('#mut').textContent=(aud.muted||aud.volume===0)?'🔇':'🔊';
 };
 
-/* ---- Search & Settings ---- */
-$('#f').onsubmit=async e=>{
+$('#f').onsubmit=e=>{
   e.preventDefault();
   const q=$('#q').value.trim();
-  if(!q)return;
-  $('#st').textContent=ytKey?'Searching YouTube…':'Searching Audius…';
-  try{
-    tracks=ytKey?await searchYouTube(q):await searchAudius(q);
-    idx=-1;
-    renderList();
-    $('#st').textContent=tracks.length?'':'No tracks found.';
-    if(tracks[0])playAt(0);
-  }catch(err){
-    $('#st').textContent=err.message;
-  }
+  if(q)runSearch(q);
 };
 $('#ls').onclick=e=>{
   const r=e.target.closest('.row');
-  if(r)playAt(+r.dataset.i);
+  if(r)playTrack(+r.dataset.i);
 };
-$('#gear').onclick=()=>$('#set').hidden=!$('#set').hidden;
-$('#ks').onclick=()=>{
-  ytKey=$('#key').value.trim();
-  ytChan=$('#chan').value;
-  LS.set('yt_key',ytKey);
-  LS.set('yt_chan',ytChan);
-  $('#set').hidden=true;
-  $('#st').textContent=ytKey?'Using YouTube Data API v3.':'Using keyless Audius audio streams.';
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  tab=b.dataset.tab;
+  renderTabs();
+  renderGenres();
+  renderList();
+});
+$('#genres').onclick=e=>{
+  const p=e.target.closest('.pill');
+  if(p)loadTrending(p.dataset.g);
 };
 
-renderList();
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.code==='Space'){e.preventDefault();aud.paused?aud.play():aud.pause();}
+  else if(e.code==='ArrowRight'&&Number.isFinite(aud.duration))aud.currentTime=Math.min(aud.duration,aud.currentTime+5);
+  else if(e.code==='ArrowLeft')aud.currentTime=Math.max(0,aud.currentTime-5);
+});
+
+if('mediaSession' in navigator){
+  navigator.mediaSession.setActionHandler('play',()=>aud.play());
+  navigator.mediaSession.setActionHandler('pause',()=>aud.pause());
+  navigator.mediaSession.setActionHandler('nexttrack',()=>nextTrack(false));
+  navigator.mediaSession.setActionHandler('previoustrack',()=>prevTrack());
+}
+
+/* Start with Trending tracks ready to play */
+loadTrending('All');
 </script>
 </body>
 </html>
