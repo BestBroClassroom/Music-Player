@@ -28,9 +28,9 @@ button{font:inherit;cursor:pointer;border:0}
 #art.crop43{transform:scale(1.36)}
 #tap-hint{display:none;position:absolute;inset:x:0;bottom:0;z-index:5;background:rgba(28,24,48,.92);color:var(--ac);font-size:12px;font-weight:700;padding:6px;text-align:center;pointer-events:none}
 
-/* Only surface the iframe when a verified embeddable video needs a direct browser click */
+/* Only surface the iframe when a verified playable video needs a direct browser click */
 #cover-box.needs-tap iframe{z-index:4;pointer-events:auto}
-#cover-box.needs-tap #art{opacity:.2;pointer-events:none}
+#cover-box.needs-tap #art{opacity:.25;pointer-events:none}
 #cover-box.needs-tap #tap-hint{display:block}
 
 .info{flex:1;min-width:0;width:100%}
@@ -132,7 +132,7 @@ let INVIDIOUS=[
 
 const $=s=>document.querySelector(s);
 const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
-let key=LS.get('key','')||BUILT_IN_KEY,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},ytmCovers=[],fails=0,drag=0,userMuted=false,kickTimer=null,tapTimer=null,playToken=0;
+let key=LS.get('key','')||BUILT_IN_KEY,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},ytmCovers=[],fails=0,drag=0,userMuted=false,kickTimer=null,verifyTimer=null,playToken=0,triedExact=false;
 const embedCache=new Map();
 
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -161,22 +161,28 @@ const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.
   }catch{}
 })();
 
-/* ---- pre-flight check via YouTube oEmbed (200 = embeddable, 401/403 = label-blocked) ---- */
+/* ---- CORS-compatible embed check via noembed.com (returns true, false, or null if unknown) ---- */
 async function canEmbed(videoId){
   if(!videoId)return false;
   if(embedCache.has(videoId))return embedCache.get(videoId);
   const ctrl=new AbortController();
   const tm=setTimeout(()=>ctrl.abort(),3500);
   try{
-    const url=`https://www.youtube.com/oembed?url=${encodeURIComponent('https://www.youtube.com/watch?v='+videoId)}&format=json`;
+    const url=`https://noembed.com/embed?url=${encodeURIComponent('https://www.youtube.com/watch?v='+videoId)}`;
     const r=await fetch(url,{signal:ctrl.signal});
-    const ok=r.ok;
-    if(r.ok||r.status===401||r.status===403||r.status===404){
-      embedCache.set(videoId,ok);
+    if(!r.ok)return null;
+    const d=await r.json();
+    if(d&&d.error){
+      embedCache.set(videoId,false);
+      return false;
     }
-    return ok;
+    if(d&&d.title){
+      embedCache.set(videoId,true);
+      return true;
+    }
+    return null;
   }catch{
-    return true;
+    return null;
   }finally{
     clearTimeout(tm);
   }
@@ -425,7 +431,6 @@ async function search(q){
     }
   }
 
-  // Fetch embeddable video links + YouTube Music square covers in parallel
   const [vidRes,ytmRes]=await Promise.allSettled([
     piped('/search?q='+encodeURIComponent(q)+'&filter=videos'),
     piped('/search?q='+encodeURIComponent(q)+'&filter=music_songs')
@@ -471,23 +476,28 @@ async function findEmbeddableAlt(track){
       try{items=await youtubeDirectSearch(q)}catch{}
     }
     for(const cand of items){
-      if(seenLocal.has(cand.id)||seen.has(cand.id))continue;
+      if(seenLocal.has(cand.id)||seen.has(cand.id)||embedCache.get(cand.id)===false)continue;
       seenLocal.add(cand.id);
       const cTok=tokens(cand.title);
       const titleMatch=!tTok.length||tTok.some(w=>cTok.includes(w));
-      const durOk=!track.duration||!cand.duration||Math.abs(track.duration-cand.duration)<=40;
+      const durOk=!track.duration||!cand.duration||Math.abs(track.duration-cand.duration)<=45;
       if(titleMatch&&durOk)pool.push(cand);
     }
   }));
 
-  const top=pool.slice(0,6);
+  const top=pool.slice(0,8);
   const checks=await Promise.all(top.map(async c=>({id:c.id,ok:await canEmbed(c.id)})));
-  const good=checks.find(x=>x.ok);
-  return good?good.id:null;
+  const verified=checks.find(x=>x.ok===true);
+  if(verified)return verified.id;
+  const untried=checks.find(x=>x.ok!==false);
+  return untried?untried.id:null;
 }
 
 async function resolvePlayableId(track){
-  if(await canEmbed(track.streamId))return track.streamId;
+  const status=await canEmbed(track.streamId);
+  if(status!==false)return track.streamId;
+
+  triedExact=true;
   $('#state-badge').textContent='Finding embeddable audio…';
   const altId=await findEmbeddableAlt(track);
   if(altId){
@@ -507,10 +517,10 @@ async function related(t){
   return search(t.artist);
 }
 
-/* ---- playback ---- */
+/* ---- playback & dead-iframe detection ---- */
 function clearTimers(){
   clearTimeout(kickTimer);
-  clearTimeout(tapTimer);
+  clearTimeout(verifyTimer);
 }
 
 function loadVideo(videoId){
@@ -523,21 +533,34 @@ function loadVideo(videoId){
   player.loadVideoById(videoId);
   player.playVideo();
 
+  // 1. Muted kickstart if browser blocks unmuted autoplay
   kickTimer=setTimeout(()=>{
     const st=player.getPlayerState?.();
     if(st!==1&&st!==3){
       player.mute();
       player.playVideo();
     }
-  },1200);
+  },1100);
 
-  tapTimer=setTimeout(()=>{
+  // 2. Verify whether the iframe actually loaded a playable video vs rendered Error 152-4
+  verifyTimer=setTimeout(()=>{
     const st=player.getPlayerState?.();
-    if(st!==1&&st!==3){
+    if(st===1||st===3)return;
+
+    const vData=player.getVideoData?.()||{};
+    const dur=player.getDuration?.()||0;
+    const isBlocked=!vData.title&&dur<=0;
+
+    if(isBlocked){
+      // YouTube rendered Error 152-4 inside the iframe without firing onError — keep cover on and swap source
+      embedCache.set(videoId,false);
+      skip(true);
+    }else{
+      // Valid video is loaded and strictly waiting for a user tap to unmute/start
       $('#state-badge').textContent='Tap cover to start';
       $('#cover-box').classList.add('needs-tap');
     }
-  },2500);
+  },2400);
 }
 
 const row=t=>`<div class="row${cur&&cur.id===t.id?' active':''}" data-id="${t.id}"><img src="${esc(t.thumb)}" onerror="this.src='https://i.ytimg.com/vi/${t.id}/hqdefault.jpg'" alt=""><div><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><small>${t.duration?fmt(t.duration):''}</small></div>`;
@@ -551,6 +574,7 @@ const meta=t=>{$('#mt').textContent=t.artist;$('#t1').textContent=fmt(t.duration
 async function play(t,back){
   const myToken=++playToken;
   clearTimers();
+  triedExact=false;
   $('#cover-box').classList.remove('needs-tap');
 
   if(cur&&!back)hist.push(cur);
@@ -587,10 +611,26 @@ async function play(t,back){
   loadVideo(playableId);
 }
 
-const skip=bad=>{
+const skip=async bad=>{
   clearTimers();
+  $('#cover-box').classList.remove('needs-tap');
+
+  // If the official video failed inside the iframe (Error 152-4), try finding an embeddable upload of this exact song first
+  if(bad===true&&cur&&!triedExact){
+    triedExact=true;
+    const myToken=playToken;
+    $('#state-badge').textContent='Finding embeddable audio…';
+    const altId=await findEmbeddableAlt(cur);
+    if(myToken!==playToken)return;
+    if(altId){
+      cur.streamId=altId;
+      loadVideo(altId);
+      return;
+    }
+  }
+
   const L=bad===true?[...results,...next]:[...next,...results];
-  const n=L.find(x=>!seen.has(x.id));
+  const n=L.find(x=>!seen.has(x.id)&&embedCache.get(x.streamId)!==false);
   if(n)play(n);
   else if(bad===true)$('#st').textContent='No more embeddable tracks in this list.';
 };
@@ -633,7 +673,7 @@ window.onYouTubeIframeAPIReady=()=>{
       $('#cover-box').classList.remove('needs-tap');
       if(cur)embedCache.set(cur.streamId,false);
       fails++;
-      if(fails>=6){
+      if(fails>=8){
         $('#state-badge').textContent='Blocked';
         $('#st').textContent=`YouTube blocked playback (Error ${e.data}). Serve over http://localhost or HTTPS and disable extensions that block Referer headers.`;
         return;
@@ -673,7 +713,6 @@ $('#pp').onclick=()=>{
   }else{
     if(!userMuted)player.unMute();
     player.playVideo();
-    setTimeout(()=>{if(player.getPlayerState()!==1)$('#cover-box').classList.add('needs-tap')},600);
   }
 };
 $('#nt').onclick=()=>{fails=0;skip()};
