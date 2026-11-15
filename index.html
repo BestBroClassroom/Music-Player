@@ -19,7 +19,6 @@ button{font:inherit;cursor:pointer;border:0}
 #set{margin-bottom:14px;padding:12px;background:var(--sf);border-radius:10px;display:flex;flex-wrap:wrap;gap:8px}
 #set small{flex-basis:100%;color:var(--mu)}
 
-/* Pure audio deck with 200x200 compliant player tucked behind the album cover */
 #deck{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:18px;margin-bottom:14px;display:flex;gap:20px;align-items:center}
 @media(max-width:580px){#deck{flex-direction:column;text-align:center}}
 #cover-box{position:relative;width:200px;height:200px;flex:none;border-radius:12px;overflow:hidden;background:#120f20;box-shadow:0 8px 24px rgba(0,0,0,.35)}
@@ -103,16 +102,23 @@ nav button.on{color:var(--tx);border-color:var(--ac)}
 
 <script>
 const BUILT_IN_KEY='';
-const PIPED=['https://pipedapi.kavin.rocks','https://pipedapi.leptons.xyz','https://pipedapi.nosebs.ru','https://pipedapi.adminforge.de','https://api.piped.private.coffee','https://pipedapi.orangenet.cc'];
+const PIPED=[
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.leptons.xyz',
+  'https://pipedapi.nosebs.ru',
+  'https://pipedapi.adminforge.de',
+  'https://api.piped.private.coffee',
+  'https://pipedapi.orangenet.cc'
+];
 
 const $=s=>document.querySelector(s);
 const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
-let key=LS.get('key','')||BUILT_IN_KEY,pi=0,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},fails=0,drag=0,triedExact=false;
+let key=LS.get('key','')||BUILT_IN_KEY,player,ready=0,cur=null,pend=null,results=[],next=[],altPool=[],seen=new Set(),hist=[],tab='res',lib={},fails=0,drag=0,triedExact=false,watchdog=null;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=s=>s>=0?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'0:00';
 const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.value};
 
-/* ---- upgrade YouTube Music cover URLs to crisp 544x544 square artwork ---- */
+/* ---- upgrade YouTube Music cover URLs to 544x544 square artwork ---- */
 function bestCover(raw,id){
   if(raw){
     if(/=w\d+-h\d+/.test(raw))return raw.replace(/=w\d+-h\d+[^&?]*/,'=w544-h544-l90-rj');
@@ -151,18 +157,27 @@ const mk=(id,title,up,dur,rawThumb)=>({id,...tidy(title,up),duration:dur||null,t
 const fromPiped=i=>mk(vidOf(i.url),i.title,i.uploaderName,i.duration,i.thumbnail);
 const isSong=i=>vidOf(i.url||'')&&(!i.duration||(i.duration>=45&&i.duration<=720));
 
-/* ---- music-focused search ---- */
+/* ---- race all Piped mirrors simultaneously so dead servers never stall ---- */
 async function piped(path){
-  for(let n=0;n<PIPED.length;n++){
-    const idx=(pi+n)%PIPED.length,c=new AbortController(),tm=setTimeout(()=>c.abort(),7000);
-    try{
-      const r=await fetch(PIPED[idx]+path,{signal:c.signal});
+  const ctrl=new AbortController();
+  const tm=setTimeout(()=>ctrl.abort(),5000);
+  try{
+    const data=await Promise.any(PIPED.map(async base=>{
+      const r=await fetch(base+path,{signal:ctrl.signal});
       if(!r.ok)throw 0;
-      const d=await r.json();pi=idx;return d;
-    }catch{}finally{clearTimeout(tm)}
+      const d=await r.json();
+      if(!d||(!d.items&&!d.relatedStreams))throw 0;
+      return d;
+    }));
+    return data;
+  }catch{
+    throw Error('Keyless search servers are busy. Try again or add a free YouTube API key in ⚙.');
+  }finally{
+    clearTimeout(tm);
+    ctrl.abort();
   }
-  throw Error('No keyless search server answered. Add a free YouTube API key in settings (⚙).');
 }
+
 async function search(q){
   if(key){
     const u=new URL('https://www.googleapis.com/youtube/v3/search');
@@ -175,18 +190,25 @@ async function search(q){
     piped('/search?q='+encodeURIComponent(q)+'&filter=music_songs'),
     piped('/search?q='+encodeURIComponent(q+' audio')+'&filter=videos')
   ]);
+  const songs=songsRes.status==='fulfilled'?(songsRes.value.items||[]).filter(isSong).map(fromPiped):[];
+  const audios=audioRes.status==='fulfilled'?(audioRes.value.items||[]).filter(isSong).map(fromPiped):[];
+  altPool=audios;
+
   const out=[],ids=new Set();
-  for(const res of [songsRes,audioRes]){
-    if(res.status!=='fulfilled')continue;
-    for(const item of (res.value.items||[]).filter(isSong)){
-      const t=fromPiped(item);
-      if(t.id&&!ids.has(t.id)){ids.add(t.id);out.push(t);}
-    }
+  for(const t of [...songs,...audios]){
+    if(t.id&&!ids.has(t.id)){ids.add(t.id);out.push(t);}
   }
   if(!out.length)throw Error('No music tracks found.');
   return out;
 }
+
 async function findExactAudio(track){
+  // 1. Check already-fetched audio uploads first (0ms)
+  const words=track.title.toLowerCase().split(/\W+/).filter(w=>w.length>2);
+  const cached=altPool.find(x=>!seen.has(x.id)&&words.some(w=>x.title.toLowerCase().includes(w)));
+  if(cached)return cached.id;
+
+  // 2. Otherwise race Piped mirrors for an audio upload of this exact song
   if(key)return null;
   try{
     const d=await piped('/search?q='+encodeURIComponent(`${track.artist} ${track.title} audio`)+'&filter=videos');
@@ -194,6 +216,7 @@ async function findExactAudio(track){
     return alt?alt.id:null;
   }catch{return null}
 }
+
 async function related(t){
   if(!key){
     try{
@@ -202,6 +225,20 @@ async function related(t){
     }catch{}
   }
   return search(t.artist);
+}
+
+/* ---- playback & watchdog ---- */
+function loadStream(videoId){
+  clearTimeout(watchdog);
+  seen.add(videoId);
+  if(!ready){pend=videoId;return;}
+  player.loadVideoById(videoId);
+  player.playVideo();
+  // Watchdog: if playback hasn't started within 4.5s, treat as blocked/stalled and move on
+  watchdog=setTimeout(()=>{
+    const st=player.getPlayerState?.();
+    if(st!==1&&st!==3)skip(true);
+  },4500);
 }
 
 /* ---- UI ---- */
@@ -214,29 +251,29 @@ function draw(){
 const meta=t=>{$('#mt').textContent=t.artist;$('#t1').textContent=fmt(t.duration||0)};
 function play(t,back){
   if(cur&&!back)hist.push(cur);
-  cur=t;triedExact=false;seen.add(t.id);seen.add(t.streamId);$('#st').textContent='';
+  cur=t;triedExact=false;seen.add(t.id);$('#st').textContent='';
   $('#deck').hidden=false;setArt(t);$('#tt').textContent=t.title;$('#t0').textContent='0:00';$('#seek').value=0;
   meta(t);draw();document.title=t.title+' · '+t.artist;
-  if(ready)player.loadVideoById(t.streamId);else pend=t;
+  loadStream(t.streamId);
   if('mediaSession' in navigator)navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.artist,artwork:[{src:t.thumb}]});
   related(t).then(r=>{r.forEach(x=>lib[x.id]=x);next=r.filter(x=>!seen.has(x.id));draw()}).catch(()=>{});
 }
 const skip=async bad=>{
-  // If label blocked the official Topic track, find an embeddable audio upload of this EXACT song first
+  clearTimeout(watchdog);
   if(bad===true&&cur&&!triedExact){
     triedExact=true;
     $('#st').textContent='Switching to embeddable audio source…';
     const altId=await findExactAudio(cur);
     if(altId){
-      cur.streamId=altId;seen.add(altId);
-      if(ready)player.loadVideoById(altId);
+      cur.streamId=altId;
+      loadStream(altId);
       return;
     }
   }
   const L=bad===true?[...results,...next]:[...next,...results];
   const n=L.find(x=>!seen.has(x.id));
   if(n)play(n);
-  else if(bad===true)$('#st').textContent='No embeddable versions left for that search.';
+  else $('#st').textContent='No embeddable versions left for that search.';
 };
 
 window.onYouTubeIframeAPIReady=()=>{
@@ -247,18 +284,27 @@ window.onYouTubeIframeAPIReady=()=>{
       const ifr=player.getIframe?.();
       if(ifr)ifr.referrerPolicy='strict-origin-when-cross-origin';
       ready=1;
-      if(pend)player.loadVideoById(pend.streamId);
+      if(pend)loadStream(pend);
     },
     onStateChange(e){
       $('#pp').textContent=e.data==1?'⏸':'▶';
       if(e.data==1){
+        clearTimeout(watchdog);
         fails=0;$('#st').textContent='';
         const d=player.getDuration()|0;
         if(cur&&d){cur.duration=d;meta(cur)}
+      }else if(e.data==3){
+        // Give slow buffering 8s before timing out
+        clearTimeout(watchdog);
+        watchdog=setTimeout(()=>{if(player.getPlayerState?.()!==1)skip(true)},8000);
+      }else if(e.data==5||e.data==-1){
+        player.playVideo();
+      }else if(e.data==0){
+        skip();
       }
-      if(e.data==0)skip();
     },
     onError(e){
+      clearTimeout(watchdog);
       fails++;
       if(fails>=5){
         $('#st').textContent=`Playback blocked (Error ${e.data}). Run on http://localhost or HTTPS and disable Referer-blocking extensions.`;
