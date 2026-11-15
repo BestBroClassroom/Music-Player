@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Multi-Source Audio Player (v5)</title>
+<title>Multi-Source Audio Player (v6)</title>
 <style>
 :root{
   --bg:#1c1830;
@@ -28,7 +28,7 @@ button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
 
 /* Search & Settings Bar */
 #f{display:flex;gap:8px;margin-bottom:12px}
-#q,#g-key,#g-cx{
+#q,#sc-cid,#ac-tok{
   flex:1;min-width:0;
   background:var(--sf);
   border:1px solid var(--ln);
@@ -37,7 +37,7 @@ button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
   color:var(--tx);
   font:inherit;
 }
-#q::placeholder,#g-key::placeholder,#g-cx::placeholder{color:var(--mu)}
+#q::placeholder,#sc-cid::placeholder,#ac-tok::placeholder{color:var(--mu)}
 #f button[type="submit"],#save-set{
   background:var(--ac);
   color:var(--ac-tx);
@@ -65,7 +65,7 @@ button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
 #set[hidden]{display:none}
 .set-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
 @media(max-width:640px){.set-grid{grid-template-columns:1fr}}
-#set small{color:var(--mu);font-size:12.5px;line-height:1.45}
+#set small{color:var(--mu);font-size:12.5px;line-height:1.4}
 
 /* Source Switcher */
 .sources{
@@ -104,11 +104,11 @@ button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
   margin-bottom:14px;
   display:flex;
   gap:20px;
-  align-items:center;
+  align-items:flex-start;
 }
 #deck[hidden]{display:none}
 @media(max-width:620px){
-  #deck{flex-direction:column;text-align:center}
+  #deck{flex-direction:column;align-items:center;text-align:center}
 }
 #art{
   width:176px;height:176px;flex:none;
@@ -145,7 +145,7 @@ button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
 #native-ctl[hidden]{display:none}
 .scrub{
   display:flex;align-items:center;gap:10px;
-  margin-top:15px;
+  margin-top:14px;
   font-size:12px;color:var(--mu);
   font-variant-numeric:tabular-nums;
 }
@@ -173,7 +173,7 @@ button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
 }
 .ctl{
   display:flex;align-items:center;justify-content:space-between;
-  gap:10px;margin-top:13px;
+  gap:10px;margin-top:12px;
 }
 @media(max-width:620px){.ctl{justify-content:center;flex-wrap:wrap}}
 .btns{display:flex;align-items:center;gap:8px}
@@ -192,18 +192,32 @@ button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
 .volbox{display:flex;align-items:center;gap:6px}
 #vol{width:84px;accent-color:var(--ac);cursor:pointer}
 
-/* audio.com Embedded Player */
-#ac-embed-wrap{margin-top:14px;border-radius:12px;overflow:hidden;background:#141024}
+/* Visible SoundCloud Widget inside Deck (prevents browser hidden-iframe audio blocks) */
+#sc-wrap{
+  margin-top:12px;
+  border-radius:10px;
+  overflow:hidden;
+  background:#141024;
+  border:1px solid var(--ln);
+}
+#sc-wrap[hidden]{display:none}
+#sc-frame{width:100%;height:166px;border:0;display:block}
+
+/* Visible audio.com Embedded Player inside Deck */
+#ac-embed-wrap{
+  margin-top:12px;
+  border-radius:10px;
+  overflow:hidden;
+  background:#141024;
+  border:1px solid var(--ln);
+}
 #ac-embed-wrap[hidden]{display:none}
-#ac-frame{width:100%;height:152px;border:0;display:block}
-#ext-link{
-  display:inline-block;margin:8px 10px;font-size:12.5px;
+#ac-frame{width:100%;height:204px;border:0;display:block}
+#ac-fallback-link{
+  display:inline-block;margin:8px 12px;font-size:12.5px;
   color:var(--ac);text-decoration:none;
 }
-#ext-link:hover{text-decoration:underline}
-
-/* Offscreen SoundCloud Widget Iframe */
-#sc-hidden{position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px}
+#ac-fallback-link:hover{text-decoration:underline}
 
 /* Status, Sub-tabs, Genre Pills & Track List */
 #st{color:var(--mu);font-size:13px;min-height:1.3em;margin-bottom:8px}
@@ -253,26 +267,26 @@ nav button.on{color:var(--tx);border-color:var(--ac)}
 <body>
 <div class="app">
   <form id="f">
-    <input id="q" placeholder="Search songs/artists, or paste a SoundCloud / audio.com URL… (v5)" autocomplete="off" autofocus>
+    <input id="q" placeholder="Search songs, artists, or paste a SoundCloud / audio.com link… (v6)" autocomplete="off" autofocus>
     <button type="submit">Search</button>
-    <button type="button" id="gear" title="Search Settings" aria-label="Search Settings">⚙</button>
+    <button type="button" id="gear" title="API Settings" aria-label="API Settings">⚙</button>
   </form>
 
   <div id="set" hidden>
     <div class="set-grid">
-      <input id="g-key" type="password" placeholder="Optional: Google Custom Search API Key" autocomplete="off">
-      <input id="g-cx" type="text" placeholder="Optional: Google Search Engine ID (cx)" autocomplete="off">
+      <input id="ac-tok" type="password" placeholder="Optional: audio.com token or client_id:client_secret" autocomplete="off">
+      <input id="sc-cid" type="text" placeholder="Optional: SoundCloud client_id override" autocomplete="off">
       <button type="button" id="save-set">Save</button>
     </div>
     <small>
-      Works keyless out of the box. For official Google Custom Search JSON results on <code>site:soundcloud.com</code> and <code>site:audio.com</code> (100 free searches/day), add a Google API Key and Programmable Search Engine ID (<code>cx</code>).
+      Works without keys. For direct <b>audio.com</b> API search, paste a Bearer token or <code>client_id:client_secret</code> from <code>audio.com/public-api</code>.
     </small>
   </div>
 
   <div class="sources" role="tablist" aria-label="Streaming Source">
     <button type="button" class="src-btn on" data-src="audius">Audius <span class="src-tag">Native Audio</span></button>
-    <button type="button" class="src-btn" data-src="soundcloud">SoundCloud <span class="src-tag">URL Filter · No 30s</span></button>
-    <button type="button" class="src-btn" data-src="audiocom">audio.com <span class="src-tag">URL Filter</span></button>
+    <button type="button" class="src-btn" data-src="soundcloud">SoundCloud <span class="src-tag">Full Tracks Only</span></button>
+    <button type="button" class="src-btn" data-src="audiocom">audio.com <span class="src-tag">Public Search</span></button>
   </div>
 
   <div id="deck" hidden>
@@ -312,9 +326,13 @@ nav button.on{color:var(--tx);border-color:var(--ac)}
         </div>
       </div>
 
+      <div id="sc-wrap" hidden>
+        <iframe id="sc-frame" allow="autoplay" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/293&auto_play=false&visual=false"></iframe>
+      </div>
+
       <div id="ac-embed-wrap" hidden>
         <iframe id="ac-frame" allow="autoplay"></iframe>
-        <a id="ext-link" href="#" target="_blank" rel="noopener" hidden>Open track page ↗</a>
+        <a id="ext-link" href="#" target="_blank" rel="noopener" hidden>Open track on audio.com ↗</a>
       </div>
     </div>
   </div>
@@ -333,14 +351,16 @@ nav button.on{color:var(--tx);border-color:var(--ac)}
 </div>
 
 <audio id="aud" preload="auto"></audio>
-<div id="sc-hidden">
-  <iframe id="sc-frame" allow="autoplay" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/293&auto_play=false"></iframe>
-</div>
 
 <script src="https://w.soundcloud.com/player/api.js"></script>
 <script>
-const APP_NAME='MultiSourceAudioPlayerV5';
+const APP_NAME='MultiSourceAudioPlayerV6';
 const GENRES=['All','Electronic','Hip-Hop/Rap','Pop','Rock','Lo-Fi','R&B/Soul','House'];
+const PROXIES=[
+  u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+];
 
 const $=s=>document.querySelector(s);
 const LS={
@@ -350,7 +370,7 @@ const LS={
 
 /* ---- State ---- */
 let source='audius';
-let audiusHosts=['https://api.audius.co'];
+let audiusHosts=['https://discoveryprovider.audius.co','https://api.audius.co'];
 let audiusHostIdx=0;
 let audiusTab='trend';
 let activeGenre='All';
@@ -367,13 +387,15 @@ let shuffle=false;
 let repeat=0;
 let streamRetries=0;
 
-let googleKey=LS.get('g_key','');
-let googleCx=LS.get('g_cx','');
-$('#g-key').value=googleKey;
-$('#g-cx').value=googleCx;
+let scClientId=LS.get('sc_cid','');
+let acCred=LS.get('ac_tok','');
+let acBearerCache='';
+$('#sc-cid').value=scClientId;
+$('#ac-tok').value=acCred;
 
 let scWidget=null;
 let scReady=false;
+let scPendingUrl='';
 let scDurationSec=0;
 let scPaused=true;
 
@@ -401,72 +423,27 @@ function fallbackArt(title,artist){
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
 
-/* =========================================================================
-   SEARCH-ENGINE URL COLLECTOR (Google CSE -> Google / Bing / Brave Readers)
-   ========================================================================= */
-async function fetchReaderText(targetUrl){
+/* ---- Sequential Relay & Reader Helpers ---- */
+async function fetchViaProxy(targetUrl,asJson=false){
+  for(const makeUrl of PROXIES){
+    try{
+      const r=await fetch(makeUrl(targetUrl),{signal:AbortSignal.timeout(8000)});
+      if(!r.ok)continue;
+      const txt=await r.text();
+      if(!txt||txt.includes('Just a moment...')||txt.includes('cf-browser-verification'))continue;
+      return asJson?JSON.parse(txt):txt;
+    }catch{}
+  }
+  throw Error('Could not reach external server through web relays.');
+}
+
+async function fetchRenderedText(targetUrl){
   const r=await fetch(`https://r.jina.ai/${targetUrl}`,{
     headers:{Accept:'text/plain'},
-    signal:AbortSignal.timeout(12000)
+    signal:AbortSignal.timeout(13000)
   });
   if(!r.ok)throw Error('Reader HTTP '+r.status);
   return await r.text();
-}
-
-async function searchWebForUrls(siteDomain,query){
-  const fullQuery=`site:${siteDomain} ${query}`;
-  const candidates=[];
-
-  // 1. Official Google Custom Search JSON API (if user configured key + cx in Settings)
-  if(googleKey&&googleCx){
-    $('#st').textContent=`Searching Google API for ${siteDomain}…`;
-    const u=new URL('https://www.googleapis.com/customsearch/v1');
-    u.search=new URLSearchParams({key:googleKey,cx:googleCx,q:fullQuery,num:'10'});
-    const r=await fetch(u,{signal:AbortSignal.timeout(8000)});
-    const d=await r.json();
-    if(!r.ok)throw Error(d.error?.message||'Google Search API error '+r.status);
-    for(const item of (d.items||[])){
-      candidates.push({
-        url:item.link||'',
-        rawTitle:item.title||'',
-        thumb:item.pagemap?.cse_thumbnail?.[0]?.src||item.pagemap?.metatags?.[0]?.['og:image']||''
-      });
-    }
-    return candidates;
-  }
-
-  // 2. Keyless Web Index Search (sequential: Google -> Bing -> Brave via CORS-open reader)
-  const engines=[
-    {name:'Google',url:`https://www.google.com/search?q=${encodeURIComponent(fullQuery)}&num=20`},
-    {name:'Bing',url:`https://www.bing.com/search?q=${encodeURIComponent(fullQuery)}&count=20`},
-    {name:'Brave',url:`https://search.brave.com/search?q=${encodeURIComponent(fullQuery)}`}
-  ];
-
-  for(const eng of engines){
-    $('#st').textContent=`Searching ${eng.name} for ${siteDomain} URLs…`;
-    try{
-      const text=await fetchReaderText(eng.url);
-      if(!text||text.includes('unusual traffic')||text.includes('solve the captcha'))continue;
-
-      // Extract markdown links: [Title](https://...)
-      const mdRx=/\[((?:[^\[\]]|\[[^\]]*\])*)\]\((https?:\/\/[^\s)]+)\)/g;
-      let m;
-      while((m=mdRx.exec(text))!==null){
-        const title=m[1].replace(/!\[[^\]]*\]\([^)]*\)/g,'').replace(/\s+/g,' ').trim();
-        candidates.push({url:m[2],rawTitle:title,thumb:''});
-      }
-
-      // Also extract bare URLs in case a search engine outputs plain links
-      const bareRx=/https?:\/\/(?:www\.|m\.)?(?:soundcloud\.com|audio\.com)\/[^\s)"'<>]+/g;
-      while((m=bareRx.exec(text))!==null){
-        candidates.push({url:m[0],rawTitle:'',thumb:''});
-      }
-
-      if(candidates.some(c=>c.url.includes(siteDomain)))break;
-    }catch{}
-  }
-
-  return candidates;
 }
 
 /* =========================================================================
@@ -478,7 +455,7 @@ async function searchWebForUrls(siteDomain,query){
     if(!r.ok)return;
     const d=await r.json();
     if(Array.isArray(d.data)&&d.data.length){
-      audiusHosts=[...new Set(['https://api.audius.co',...d.data])];
+      audiusHosts=[...new Set([...d.data,'https://discoveryprovider.audius.co','https://api.audius.co'])];
     }
   }catch{}
 })();
@@ -550,148 +527,206 @@ async function searchAudius(q){
 }
 
 /* =========================================================================
-   2. SOUNDCLOUD ENGINE (Search-Engine URL Filter + Full Tracks Only)
+   2. SOUNDCLOUD ENGINE (Full Tracks Only — Excludes 30s Previews)
    ========================================================================= */
-const SC_BAD_OWNER=new Set([
-  'discover','stream','upload','search','charts','stations','tags','you','pages',
-  'jobs','press','blog','mobile','pro','go','creators','artists','people',
-  'terms-of-use','privacy','imprint','cookie-policy','community-guidelines','popular'
-]);
-const SC_BAD_SLUG=new Set([
-  'sets','likes','reposts','following','followers','tracks','albums',
-  'popular-tracks','comments','recommended','related'
-]);
+function isSoundCloudFullTrack(t){
+  if(!t||!t.permalink_url)return false;
+  if(t.policy==='SNIP'||t.snipped===true)return false;
+  if(t.embeddable_by==='none')return false;
+  const dur=Number(t.duration||0);
+  const full=Number(t.full_duration||dur);
+  if(full>0&&dur>0&&(full-dur)>5000)return false;
+  if(dur===30000&&full>35000)return false;
+  return true;
+}
 
-function filterSoundCloudTrackUrls(candidates){
-  const out=[];
-  const seen=new Set();
+function mapSoundCloudTrack(t){
+  const title=t.title||'Untitled';
+  const artist=t.user?.username||t.user?.full_name||'SoundCloud Artist';
+  const fb=fallbackArt(title,artist);
+  const rawArt=t.artwork_url||t.user?.avatar_url||'';
+  const thumbSm=rawArt?rawArt.replace('-large.','-t200x200.'):fb;
+  const thumbLg=rawArt?rawArt.replace('-large.','-t500x500.'):fb;
+  return{
+    engine:'soundcloud',
+    id:String(t.id),
+    permalinkUrl:t.permalink_url,
+    title,
+    artist,
+    verified:Boolean(t.user?.verified),
+    meta:t.genre||'Full Track',
+    plays:t.playback_count||0,
+    duration:Math.round((t.full_duration||t.duration||0)/1000),
+    thumbSm,
+    thumbLg,
+    fallback:fb
+  };
+}
 
-  for(const item of candidates){
-    const m=(item.url||'').match(/https?:\/\/(?:www\.|m\.)?soundcloud\.com\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_-]+)(?:[/?#]|$)/i);
-    if(!m)continue;
-    const owner=m[1].toLowerCase();
-    const slug=m[2].toLowerCase();
-    if(SC_BAD_OWNER.has(owner)||SC_BAD_SLUG.has(slug))continue;
-
-    const cleanUrl=`https://soundcloud.com/${m[1]}/${m[2]}`;
-    if(seen.has(cleanUrl))continue;
-    seen.add(cleanUrl);
-
-    // Clean search engine titles like "Stream Song Name by Artist | Listen online..."
-    let cleanTitle=(item.rawTitle||'')
-      .replace(/^Stream\s+/i,'')
-      .replace(/\s*\|\s*Listen online.*$/i,'')
-      .replace(/\s*\|\s*SoundCloud.*$/i,'')
-      .trim();
-
-    let title=cleanTitle||humanizeSlug(m[2]);
-    let artist=humanizeSlug(m[1]);
-    const byMatch=cleanTitle.match(/^(.+?)\s+by\s+(.+)$/i);
-    if(byMatch){
-      title=byMatch[1].trim();
-      artist=byMatch[2].trim();
+function extractBalancedArray(text,marker){
+  const idx=text.indexOf(marker);
+  if(idx<0)return null;
+  const start=text.indexOf('[',idx);
+  if(start<0)return null;
+  let depth=0,inStr=false,escNext=false;
+  for(let i=start;i<text.length;i++){
+    const ch=text[i];
+    if(inStr){
+      if(escNext)escNext=false;
+      else if(ch==='\\')escNext=true;
+      else if(ch==='"')inStr=false;
+    }else{
+      if(ch==='"')inStr=true;
+      else if(ch==='[')depth++;
+      else if(ch===']'){
+        depth--;
+        if(depth===0){
+          try{return JSON.parse(text.slice(start,i+1))}catch{return null}
+        }
+      }
     }
-
-    const fb=fallbackArt(title,artist);
-    out.push({
-      engine:'soundcloud',
-      id:cleanUrl,
-      permalinkUrl:cleanUrl,
-      title,
-      artist,
-      verified:false,
-      meta:'SoundCloud URL',
-      plays:0,
-      duration:0,
-      thumbSm:item.thumb||fb,
-      thumbLg:item.thumb||fb,
-      fallback:fb,
-      isPreview:false
-    });
-    if(out.length>=20)break;
   }
-  return out;
+  return null;
+}
+
+async function ensureSoundCloudClientId(){
+  if(scClientId)return scClientId;
+  const html=await fetchViaProxy('https://soundcloud.com',false);
+  const hydration=extractBalancedArray(html,'window.__sc_hydration');
+  const apiClient=Array.isArray(hydration)?hydration.find(x=>x&&x.hydratable==='apiClient'):null;
+  const cid=apiClient?.data?.id;
+  if(cid){
+    scClientId=cid;
+    LS.set('sc_cid',cid);
+    return cid;
+  }
+  throw Error('Could not obtain SoundCloud client_id');
 }
 
 async function searchSoundCloud(q){
-  const rawCandidates=await searchWebForUrls('soundcloud.com',q);
-  scTracks=filterSoundCloudTrackUrls(rawCandidates);
+  $('#st').textContent='Searching SoundCloud (filtering out 30s previews)…';
+  let items=[];
+  try{
+    const cid=await ensureSoundCloudClientId();
+    const apiUrl=`https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&client_id=${encodeURIComponent(cid)}&limit=35`;
+    const data=await fetchViaProxy(apiUrl,true);
+    items=Array.isArray(data?.collection)?data.collection:[];
+  }catch{
+    const html=await fetchViaProxy(`https://soundcloud.com/search/sounds?q=${encodeURIComponent(q)}`,false);
+    const hydration=extractBalancedArray(html,'window.__sc_hydration')||[];
+    for(const entry of hydration){
+      if(Array.isArray(entry?.data?.collection))items.push(...entry.data.collection);
+      else if(entry?.hydratable==='sound'&&entry?.data)items.push(entry.data);
+    }
+  }
+
+  const totalRaw=items.length;
+  scTracks=items.filter(isSoundCloudFullTrack).map(mapSoundCloudTrack);
+  const skipped=Math.max(0,totalRaw-scTracks.length);
   renderList();
 
   if(!scTracks.length){
-    $('#st').textContent=`No direct SoundCloud track URLs found for "${q}". Try adding a free Google Search API key in ⚙ or pasting a SoundCloud link.`;
+    $('#st').textContent=totalRaw
+      ?`All ${totalRaw} SoundCloud results were 30-second Go+ previews and were excluded.`
+      :`No full-length SoundCloud tracks found for "${q}".`;
     return;
   }
-  $('#st').textContent=`Found ${scTracks.length} SoundCloud track URLs (30s Go+ previews auto-skipped on load).`;
+  $('#st').textContent=skipped
+    ?`Loaded ${scTracks.length} full tracks (${skipped} 30-second Go+ previews excluded).`
+    :'';
   playTrack(0);
 }
 
 /* =========================================================================
-   3. AUDIO.COM ENGINE (Search-Engine URL Filter + Embed Player)
+   3. AUDIO.COM ENGINE (Public Search + Raw HTML/oEmbed ID Resolver)
    ========================================================================= */
-const AC_BAD_OWNER=new Set([
-  'search','explore','collections','public-api','login','signup','embed',
-  'api','oauth','static','assets','terms','privacy','blog','help','about'
-]);
+async function getAudioComBearer(){
+  if(!acCred)return '';
+  if(!acCred.includes(':'))return acCred;
+  if(acBearerCache)return acBearerCache;
+  const [clientId,clientSecret]=acCred.split(':');
+  const r=await fetch('https://api.audio.com/oauth/token',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      grant_type:'client_credentials',
+      client_id:clientId.trim(),
+      client_secret:clientSecret.trim()
+    })
+  });
+  if(!r.ok)throw Error('audio.com OAuth token error '+r.status);
+  const d=await r.json();
+  acBearerCache=d.access_token||'';
+  return acBearerCache;
+}
 
-function filterAudioComTrackUrls(candidates){
+function mapAudioComTrack(item){
+  const rawId=String(item.id||item.audioId||'');
+  const numericId=/^\d{6,}$/.test(rawId)?rawId:'';
+  const slug=item.slug||'';
+  const owner=item.user?.username||item.author?.username||item.owner?.username||item.username||'';
+  const title=(item.title||item.name||humanizeSlug(slug)||'Untitled').trim();
+  const artist=(item.user?.name||item.author?.name||humanizeSlug(owner)||'audio.com Creator').trim();
+  const fb=fallbackArt(title,artist);
+  const cover=item.cover?.url||item.coverUrl||item.image||item.artwork||fb;
+  const pageUrl=item.pageUrl||item.url||(owner&&slug?`https://audio.com/${owner}/audio/${slug}`:(numericId?`https://audio.com/audio/${numericId}`:''));
+  return{
+    engine:'audiocom',
+    id:numericId||pageUrl||title,
+    numericId,
+    pageUrl,
+    embedUrl:numericId?`https://audio.com/embed/audio/${encodeURIComponent(numericId)}?theme=image&autoplay=1`:'',
+    title,
+    artist,
+    verified:false,
+    meta:item.category||'audio.com',
+    plays:item.playsCount||item.plays||0,
+    duration:Math.round(Number(item.duration||0)),
+    thumbSm:cover,
+    thumbLg:cover,
+    fallback:fb
+  };
+}
+
+function parseAudioComTracksFromText(text){
   const out=[];
   const seen=new Set();
+  const reserved=new Set(['search','explore','collections','public-api','login','signup','embed','api','oauth','static','assets','terms','privacy']);
 
-  for(const item of candidates){
-    const rawUrl=item.url||'';
-    // Match https://audio.com/{user}/audio/{slug}
-    const slugMatch=rawUrl.match(/https?:\/\/(?:www\.)?audio\.com\/([a-zA-Z0-9._-]+)\/audio\/([a-zA-Z0-9._-]+)/i);
-    // Match https://audio.com/audio/{numericId} or /embed/audio/{numericId}
-    const idMatch=rawUrl.match(/https?:\/\/(?:www\.)?audio\.com\/(?:audio|embed\/audio)\/(\d{6,20})/i);
-
-    let cleanUrl='',numericId='',owner='',slug='';
-    if(slugMatch){
-      owner=slugMatch[1];
-      slug=slugMatch[2];
-      if(AC_BAD_OWNER.has(owner.toLowerCase()))continue;
-      cleanUrl=`https://audio.com/${owner}/audio/${slug}`;
-    }else if(idMatch){
-      numericId=idMatch[1];
-      cleanUrl=`https://audio.com/audio/${numericId}`;
-    }else{
-      continue;
-    }
-
-    if(seen.has(cleanUrl))continue;
-    seen.add(cleanUrl);
-
-    let cleanTitle=(item.rawTitle||'')
-      .replace(/\s*[\|\-–]\s*audio\.com.*$/i,'')
-      .trim();
-
-    let title=cleanTitle||(slug?humanizeSlug(slug):`audio.com Track (${numericId})`);
-    let artist=owner?humanizeSlug(owner):'audio.com Creator';
-    const byMatch=cleanTitle.match(/^(.+?)\s+by\s+(.+)$/i);
-    if(byMatch){
-      title=byMatch[1].trim();
-      artist=byMatch[2].trim();
-    }
-
-    const fb=fallbackArt(title,artist);
-    out.push({
-      engine:'audiocom',
-      id:cleanUrl,
-      numericId,
-      pageUrl:cleanUrl,
-      embedUrl:numericId?`https://audio.com/embed/audio/${numericId}?theme=image&autoplay=1`:'',
-      title,
-      artist,
-      verified:false,
-      meta:'audio.com URL',
-      plays:0,
-      duration:0,
-      thumbSm:item.thumb||fb,
-      thumbLg:item.thumb||fb,
-      fallback:fb
-    });
-    if(out.length>=20)break;
+  const mdRx=/\[((?:[^\[\]]|\[[^\]]*\])*)\]\((https?:\/\/(?:www\.)?audio\.com\/([a-zA-Z0-9._-]+)\/audio\/([a-zA-Z0-9._-]+)(?:[?#][^\s)]*)?)\)/g;
+  let m;
+  while((m=mdRx.exec(text))!==null){
+    const url=m[2].split(/[?#]/)[0];
+    const owner=m[3];
+    const slug=m[4];
+    if(reserved.has(owner.toLowerCase())||seen.has(url))continue;
+    seen.add(url);
+    const cleanedTitle=m[1].replace(/!\[[^\]]*\]\([^)]*\)/g,'').replace(/\s+/g,' ').trim();
+    out.push(mapAudioComTrack({
+      title:cleanedTitle||humanizeSlug(slug),
+      username:owner,
+      slug,
+      pageUrl:url
+    }));
+    if(out.length>=25)return out;
   }
+
+  const urlRx=/https?:\/\/(?:www\.)?audio\.com\/([a-zA-Z0-9._-]+)\/audio\/([a-zA-Z0-9._-]+)/g;
+  while((m=urlRx.exec(text))!==null){
+    const owner=m[1];
+    const slug=m[2];
+    const url=`https://audio.com/${owner}/audio/${slug}`;
+    if(reserved.has(owner.toLowerCase())||seen.has(url))continue;
+    seen.add(url);
+    out.push(mapAudioComTrack({
+      title:humanizeSlug(slug),
+      username:owner,
+      slug,
+      pageUrl:url
+    }));
+    if(out.length>=25)return out;
+  }
+
   return out;
 }
 
@@ -699,28 +734,31 @@ async function resolveAudioComEmbed(track){
   if(track.embedUrl)return track.embedUrl;
   if(!track.pageUrl)return '';
 
+  // 1. Fetch raw oEmbed JSON through CORS proxy (preserves <iframe> HTML inside JSON)
   const oembedUrl=`https://audio.com/oembed?url=${encodeURIComponent(track.pageUrl)}&format=json`;
   try{
-    const txt=await fetchReaderText(oembedUrl);
-    const jsonMatch=txt.match(/\{[\s\S]*\}/);
-    if(jsonMatch){
-      const data=JSON.parse(jsonMatch[0]);
-      const srcMatch=(data?.html||'').match(/src=["']([^"']*audio\.com\/embed\/audio\/[^"']+)["']/i);
-      if(srcMatch){
-        const u=new URL(srcMatch[1]);
-        u.searchParams.set('autoplay','1');
-        track.embedUrl=u.toString();
-        if(data.title)track.title=data.title;
-        if(data.author_name)track.artist=data.author_name;
-        if(data.thumbnail_url){track.thumbSm=data.thumbnail_url;track.thumbLg=data.thumbnail_url;}
-        return track.embedUrl;
-      }
+    const data=await fetchViaProxy(oembedUrl,true);
+    const srcMatch=(data?.html||'').match(/src=["']([^"']*audio\.com\/embed\/audio\/[^"']+)["']/i);
+    if(srcMatch){
+      const u=new URL(srcMatch[1]);
+      u.searchParams.set('autoplay','1');
+      track.embedUrl=u.toString();
+      if(data.title)track.title=data.title;
+      if(data.author_name)track.artist=data.author_name;
+      if(data.thumbnail_url){track.thumbSm=data.thumbnail_url;track.thumbLg=data.thumbnail_url;}
+      return track.embedUrl;
     }
   }catch{}
 
+  // 2. Fetch raw HTML of the track page via CORS proxy to extract the 16-digit track ID
   try{
-    const pageText=await fetchReaderText(track.pageUrl);
-    const idMatch=pageText.match(/audio\.com\/embed\/audio\/(\d{6,20})/);
+    const rawHtml=await fetchViaProxy(track.pageUrl,false);
+    const idMatch=
+      rawHtml.match(/audio\.com\/embed\/audio\/(\d{8,20})/)||
+      rawHtml.match(/"audioId"\s*:\s*"?(\d{8,20})"?/)||
+      rawHtml.match(/"id"\s*:\s*"?(\d{14,20})"?/);
+    const ogImg=rawHtml.match(/property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+    if(ogImg&&ogImg[1]){track.thumbSm=ogImg[1];track.thumbLg=ogImg[1];}
     if(idMatch){
       track.numericId=idMatch[1];
       track.embedUrl=`https://audio.com/embed/audio/${idMatch[1]}?theme=image&autoplay=1`;
@@ -732,57 +770,90 @@ async function resolveAudioComEmbed(track){
 }
 
 async function searchAudioCom(q){
-  const rawCandidates=await searchWebForUrls('audio.com',q);
-  acTracks=filterAudioComTrackUrls(rawCandidates);
+  $('#st').textContent='Searching audio.com…';
+  let found=[];
+
+  if(acCred){
+    try{
+      const token=await getAudioComBearer();
+      const r=await fetch(`https://api.audio.com/v1/search?q=${encodeURIComponent(q)}&type=audio&per-page=25`,{
+        headers:{Accept:'application/json',Authorization:`Bearer ${token}`},
+        signal:AbortSignal.timeout(7000)
+      });
+      if(r.ok){
+        const d=await r.json();
+        const arr=d.data||d.items||d.results||[];
+        found=arr.map(mapAudioComTrack).filter(x=>x.id);
+      }
+    }catch{}
+  }
+
+  if(!found.length){
+    try{
+      const rendered=await fetchRenderedText(`https://audio.com/search?q=${encodeURIComponent(q)}`);
+      found=parseAudioComTracksFromText(rendered);
+    }catch{}
+  }
+
+  if(!found.length){
+    try{
+      const webRendered=await fetchRenderedText(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(`site:audio.com/audio ${q}`)}`);
+      found=parseAudioComTracksFromText(webRendered);
+    }catch{}
+  }
+
+  acTracks=found;
   renderList();
 
   if(!acTracks.length){
-    $('#st').textContent=`No direct audio.com track URLs found for "${q}". Try adding a free Google Search API key in ⚙ or pasting an audio.com link.`;
+    $('#st').textContent=`No public tracks returned for "${q}" on audio.com. Try pasting a direct audio.com track link.`;
     return;
   }
-  $('#st').textContent=`Found ${acTracks.length} audio.com track URLs.`;
+  $('#st').textContent='';
   playTrack(0);
 }
 
 /* =========================================================================
-   4. UNIFIED PLAYBACK & 30s SOUNDCLOUD PREVIEW GUARD
+   4. UNIFIED PLAYBACK & CONTROLS
    ========================================================================= */
+function loadSoundCloudTrackInWidget(url){
+  if(!scWidget)return;
+  scWidget.load(url,{
+    auto_play:true,
+    visual:false,
+    show_artwork:false,
+    buying:false,
+    sharing:false,
+    download:false,
+    show_comments:false,
+    callback(){
+      scReady=true;
+      scWidget.setVolume(+$('#vol').value);
+      scWidget.play();
+    }
+  });
+}
+
 function initSoundCloudWidget(){
   if(!window.SC||!window.SC.Widget)return;
   scWidget=window.SC.Widget($('#sc-frame'));
-  scWidget.bind(window.SC.Widget.Events.READY,()=>{scReady=true;});
+  scWidget.bind(window.SC.Widget.Events.READY,()=>{
+    scReady=true;
+    if(scPendingUrl){
+      const u=scPendingUrl;
+      scPendingUrl='';
+      loadSoundCloudTrackInWidget(u);
+    }
+  });
   scWidget.bind(window.SC.Widget.Events.PLAY,()=>{
     if(activeEngine!=='soundcloud')return;
     scPaused=false;
     $('#pp').textContent='⏸';
     $('#badge').textContent='Now playing';
-
     scWidget.getDuration(ms=>{
-      const sec=Math.round((ms||0)/1000);
-      // Exclude 30-second Go+ previews automatically
-      if(sec>0&&sec<=30){
-        try{scWidget.pause();}catch{}
-        const skippedTitle=queue[idx]?.title||'Track';
-        if(queue[idx]){
-          queue[idx].isPreview=true;
-          queue[idx].meta='30s Go+ Preview (Excluded)';
-          queue[idx].duration=sec;
-        }
-        renderList();
-        $('#st').textContent=`Excluded "${skippedTitle}" (30-second Go+ preview) — skipping to next full track…`;
-        const nextFullIdx=queue.findIndex((t,i)=>i>idx&&!t.isPreview);
-        if(nextFullIdx>=0)playTrack(nextFullIdx);
-        else{
-          $('#badge').textContent='No full tracks left';
-          $('#pp').textContent='▶';
-        }
-        return;
-      }
-
-      scDurationSec=sec;
+      scDurationSec=Math.round((ms||0)/1000);
       if(scDurationSec&&queue[idx]){
         queue[idx].duration=scDurationSec;
-        queue[idx].meta='Full Track';
         $('#t1').textContent=fmt(scDurationSec);
         renderList();
       }
@@ -814,7 +885,7 @@ function stopAllEngines(){
     try{scWidget.pause();}catch{}
   }
   $('#ac-frame').src='about:blank';
-  $('#ext-link').hidden=true;
+  $('#ac-fallback-link').hidden=true;
 }
 
 function getActiveList(){
@@ -865,34 +936,28 @@ async function playTrack(i){
 
   if(t.engine==='audius'){
     $('#native-ctl').hidden=false;
+    $('#sc-wrap').hidden=true;
     $('#ac-embed-wrap').hidden=true;
     $('#badge').textContent='Loading audio…';
     aud.src=audiusStreamUrl(t.id,audiusHostIdx);
-    aud.load();
     aud.play().catch(()=>{$('#badge').textContent='Press ▶ to play';});
   }else if(t.engine==='soundcloud'){
     $('#native-ctl').hidden=false;
+    $('#sc-wrap').hidden=false;
     $('#ac-embed-wrap').hidden=true;
     $('#badge').textContent='Loading SoundCloud…';
     scDurationSec=t.duration||0;
     if(scReady&&scWidget){
-      scWidget.load(t.permalinkUrl,{
-        auto_play:true,
-        show_artwork:false,
-        buying:false,
-        sharing:false,
-        download:false,
-        show_comments:false
-      });
-      scWidget.setVolume(+$('#vol').value);
+      loadSoundCloudTrackInWidget(t.permalinkUrl);
     }else{
-      $('#sc-frame').src=`https://w.soundcloud.com/player/?url=${encodeURIComponent(t.permalinkUrl)}&auto_play=true`;
-      setTimeout(initSoundCloudWidget,800);
+      scPendingUrl=t.permalinkUrl;
+      initSoundCloudWidget();
     }
   }else if(t.engine==='audiocom'){
     $('#native-ctl').hidden=true;
+    $('#sc-wrap').hidden=true;
     $('#ac-embed-wrap').hidden=false;
-    $('#badge').textContent='Resolving audio.com embed…';
+    $('#badge').textContent='Resolving audio.com player…';
     const embed=await resolveAudioComEmbed(t);
     if(queue[idx]!==t)return;
     $('#tt').textContent=t.title;
@@ -909,7 +974,7 @@ async function playTrack(i){
       $('#ac-frame').hidden=true;
     }
     if(t.pageUrl){
-      const link=$('#ext-link');
+      const link=$('#ac-fallback-link');
       link.href=t.pageUrl;
       link.hidden=false;
     }
@@ -1073,8 +1138,8 @@ function renderList(){
     const hint=source==='audius'
       ?'Search Audius above or pick a trending genre.'
       :source==='soundcloud'
-        ?'Search SoundCloud above (filters web results to direct track URLs only & skips 30s previews) or paste a SoundCloud link.'
-        :'Search audio.com above (filters web results to direct track URLs only) or paste an audio.com link.';
+        ?'Search SoundCloud above (30-second Go+ previews are automatically excluded) or paste a SoundCloud URL.'
+        :'Search audio.com above or paste an audio.com track URL.';
     $('#ls').innerHTML=`<p class="msg">${hint}</p>`;
     return;
   }
@@ -1091,37 +1156,74 @@ function renderList(){
 }
 
 /* ---- Direct URL Handler & Search Submit ---- */
-function handleDirectUrl(url){
+async function handleDirectUrl(url){
   if(/soundcloud\.com\//i.test(url)){
-    const filtered=filterSoundCloudTrackUrls([{url,rawTitle:''}]);
-    if(!filtered.length){
-      $('#st').textContent='Please paste a direct SoundCloud track URL (e.g., https://soundcloud.com/artist/track).';
-      return true;
-    }
     source='soundcloud';
-    scTracks=filtered;
     renderSubControls();
-    renderList();
-    $('#st').textContent='';
-    playTrack(0);
-    return true;
-  }
-
-  if(/audio\.com\//i.test(url)){
-    const filtered=filterAudioComTrackUrls([{url,rawTitle:''}]);
-    if(!filtered.length){
-      $('#st').textContent='Please paste a direct audio.com track URL (e.g., https://audio.com/user/audio/track).';
-      return true;
+    $('#st').textContent='Loading SoundCloud link…';
+    try{
+      const cid=await ensureSoundCloudClientId();
+      const data=await fetchViaProxy(`https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(url)}&client_id=${encodeURIComponent(cid)}`,true);
+      if(data&&data.kind==='track'){
+        if(!isSoundCloudFullTrack(data)){
+          $('#st').textContent='This SoundCloud link is a 30-second Go+ preview and was excluded.';
+          return true;
+        }
+        scTracks=[mapSoundCloudTrack(data)];
+      }else if(data&&Array.isArray(data.tracks)){
+        scTracks=data.tracks.filter(isSoundCloudFullTrack).map(mapSoundCloudTrack);
+      }
+    }catch{
+      scTracks=[{
+        engine:'soundcloud',
+        id:url,
+        permalinkUrl:url,
+        title:humanizeSlug(url.split('/').filter(Boolean).pop()),
+        artist:'SoundCloud Track',
+        verified:false,
+        meta:'Direct Link',
+        plays:0,
+        duration:0,
+        thumbSm:fallbackArt('SC','SoundCloud'),
+        thumbLg:fallbackArt('SC','SoundCloud'),
+        fallback:fallbackArt('SC','SoundCloud')
+      }];
     }
+    renderList();
+    $('#st').textContent='';
+    if(scTracks.length)playTrack(0);
+    return true;
+  }
+
+  const acIdMatch=url.match(/audio\.com\/(?:audio|embed\/audio)\/(\d{6,})/i);
+  if(acIdMatch){
     source='audiocom';
-    acTracks=filtered;
     renderSubControls();
+    const rawId=acIdMatch[1];
+    acTracks=[mapAudioComTrack({id:rawId,title:`audio.com Track (${rawId})`,pageUrl:url})];
     renderList();
     $('#st').textContent='';
     playTrack(0);
     return true;
   }
 
+  const acSlugMatch=url.match(/audio\.com\/([^/?#]+)\/audio\/([^/?#]+)/i);
+  if(acSlugMatch){
+    source='audiocom';
+    renderSubControls();
+    const owner=acSlugMatch[1];
+    const slug=acSlugMatch[2];
+    acTracks=[mapAudioComTrack({
+      title:humanizeSlug(slug),
+      username:owner,
+      slug,
+      pageUrl:url.split(/[?#]/)[0]
+    })];
+    renderList();
+    $('#st').textContent='';
+    playTrack(0);
+    return true;
+  }
   return false;
 }
 
@@ -1129,7 +1231,7 @@ $('#f').onsubmit=async e=>{
   e.preventDefault();
   const q=$('#q').value.trim();
   if(!q)return;
-  if(/^https?:\/\//i.test(q)&&handleDirectUrl(q))return;
+  if(/^https?:\/\//i.test(q)&&await handleDirectUrl(q))return;
 
   try{
     if(source==='audius')await searchAudius(q);
@@ -1167,14 +1269,13 @@ $('#ls').onclick=e=>{
 
 $('#gear').onclick=()=>$('#set').hidden=!$('#set').hidden;
 $('#save-set').onclick=()=>{
-  googleKey=$('#g-key').value.trim();
-  googleCx=$('#g-cx').value.trim();
-  LS.set('g_key',googleKey);
-  LS.set('g_cx',googleCx);
+  acCred=$('#ac-tok').value.trim();
+  acBearerCache='';
+  scClientId=$('#sc-cid').value.trim();
+  LS.set('ac_tok',acCred);
+  LS.set('sc_cid',scClientId);
   $('#set').hidden=true;
-  $('#st').textContent=googleKey&&googleCx
-    ?'Google Custom Search API saved.'
-    :'Using keyless web search.';
+  $('#st').textContent='Settings saved.';
 };
 
 document.addEventListener('keydown',e=>{
