@@ -19,11 +19,12 @@ button{font:inherit;cursor:pointer;border:0}
 #set{margin-bottom:14px;padding:12px;background:var(--sf);border-radius:10px;display:flex;flex-wrap:wrap;gap:8px}
 #set small{flex-basis:100%;color:var(--mu)}
 
+/* Audio deck: hidden 200x200 video iframe sits underneath the 200x200 album cover */
 #deck{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:18px;margin-bottom:14px;display:flex;gap:20px;align-items:center}
 @media(max-width:580px){#deck{flex-direction:column;text-align:center}}
 #cover-box{position:relative;width:200px;height:200px;flex:none;border-radius:12px;overflow:hidden;background:#120f20;box-shadow:0 8px 24px rgba(0,0,0,.35)}
-#cover-box iframe{position:absolute;inset:0;width:200px;height:200px;border:0;pointer-events:none}
-#art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;background:var(--bg)}
+#cover-box iframe{position:absolute;inset:0;width:200px;height:200px;border:0;z-index:1;pointer-events:none}
+#art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;background:var(--bg);transition:opacity .2s}
 #art.crop43{transform:scale(1.36)}
 .info{flex:1;min-width:0;width:100%}
 .badge{color:var(--ac);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:11px}
@@ -64,7 +65,7 @@ nav button.on{color:var(--tx);border-color:var(--ac)}
   <div id="set" hidden>
     <input id="key" type="password" placeholder="YouTube Data API key (optional)" autocomplete="off">
     <button id="ks">Save</button>
-    <small>Without a key, search uses public Piped servers. A free YouTube Data API key makes search faster and steadier.</small>
+    <small>Without a key, search uses public Piped/Invidious mirrors. A free YouTube Data API key makes search faster and steadier.</small>
   </div>
 
   <div id="deck" hidden>
@@ -110,68 +111,155 @@ const PIPED=[
   'https://api.piped.private.coffee',
   'https://pipedapi.orangenet.cc'
 ];
+const INVIDIOUS=[
+  'https://inv.nadeko.net',
+  'https://invidious.nerdvpn.de',
+  'https://yt.artemislena.eu'
+];
 
 const $=s=>document.querySelector(s);
 const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
-let key=LS.get('key','')||BUILT_IN_KEY,player,ready=0,cur=null,pend=null,results=[],next=[],altPool=[],seen=new Set(),hist=[],tab='res',lib={},fails=0,drag=0,triedExact=false,watchdog=null;
+let key=LS.get('key','')||BUILT_IN_KEY,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},ytmCovers=[],fails=0,drag=0,watchdog=null;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=s=>s>=0?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'0:00';
 const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.value};
 
-/* ---- upgrade YouTube Music cover URLs to 544x544 square artwork ---- */
-function bestCover(raw,id){
-  if(raw){
-    if(/=w\d+-h\d+/.test(raw))return raw.replace(/=w\d+-h\d+[^&?]*/,'=w544-h544-l90-rj');
-    if(/=s\d+/.test(raw))return raw.replace(/=s\d+[^&?]*/,'=s544');
-    if(!raw.includes('ytimg.com'))return raw;
-  }
-  return `https://i.ytimg.com/vi/${id}/maxresdefault.jpg`;
+/* ---- title cleaning & fuzzy matching for YouTube Music cover alignment ---- */
+const JUNK=/\s*[\(\[][^\)\]]*(official|audio|lyric|video|visuali[sz]er|remaster|hd|4k|hq|live|version|explicit)[^\)\]]*[\)\]]/ig;
+function tidy(title,up){
+  let a=(up||'').replace(/\s*-\s*Topic$|VEVO$/i,'').trim();
+  let t=(title||'').replace(JUNK,'').trim();
+  const k=t.indexOf(' - ');
+  if(k>0){a=t.slice(0,k).trim();t=t.slice(k+3).trim()}
+  return{title:t,artist:a};
 }
+const norm=s=>(s||'').toLowerCase().replace(JUNK,'').replace(/\b(ft|feat|featuring)\b.*/g,'').replace(/[^a-z0-9\u00c0-\u024f]+/g,' ').trim();
+
+function upgradeYtmUrl(raw){
+  if(!raw)return '';
+  if(/=w\d+-h\d+/.test(raw))return raw.replace(/=w\d+-h\d+[^&?]*/,'=w544-h544-l90-rj');
+  if(/=s\d+/.test(raw))return raw.replace(/=s\d+[^&?]*/,'=s544');
+  return raw;
+}
+
+function matchYtmCover(track,pool=ytmCovers){
+  if(!pool.length)return null;
+  const nt=norm(track.title),na=norm(track.artist);
+  if(!nt)return null;
+  let best=null,bestScore=0;
+  for(const c of pool){
+    let score=0;
+    if(c.nt===nt)score+=5;
+    else if(c.nt.includes(nt)||nt.includes(c.nt))score+=3;
+    if(na&&(c.na===na||c.na.includes(na)||na.includes(c.na)))score+=3;
+    if(score>bestScore){bestScore=score;best=c;}
+  }
+  return bestScore>=3?best:null;
+}
+
 function setArt(t){
   const img=$('#art');
   img.className='';
+  const fallback=`https://i.ytimg.com/vi/${t.id}/hqdefault.jpg`;
   img.onerror=()=>{
     img.onerror=null;
     img.className='crop43';
-    img.src=`https://i.ytimg.com/vi/${t.id}/hqdefault.jpg`;
+    img.src=fallback;
   };
   img.onload=()=>{
     if(img.src.includes('maxresdefault')&&img.naturalWidth<=120){
       img.className='crop43';
-      img.src=`https://i.ytimg.com/vi/${t.id}/hqdefault.jpg`;
+      img.src=fallback;
+    }else if(!t.hasYtmArt&&img.naturalWidth>img.naturalHeight){
+      img.className='crop43';
     }
   };
   img.src=t.thumb;
 }
 
-/* ---- clean YouTube titles into song + artist ---- */
-const JUNK=/\s*[\(\[][^\)\]]*(official|audio|lyric|video|visuali[sz]er|remaster|hd|4k)[^\)\]]*[\)\]]/ig;
-function tidy(title,up){
-  let a=(up||'').replace(/\s*-\s*Topic$|VEVO$/i,'').trim(),t=(title||'').replace(JUNK,'').trim();
-  const k=t.indexOf(' - ');
-  if(k>0){a=t.slice(0,k).trim();t=t.slice(k+3).trim()}
-  return{title:t,artist:a};
+/* Align current playing video with its official YouTube Music album cover */
+async function alignCover(track){
+  // 1. Check cached YouTube Music covers from search
+  const hit=matchYtmCover(track);
+  if(hit){
+    track.thumb=hit.cover;
+    track.hasYtmArt=true;
+    if(hit.artist&&track.artist.toLowerCase().includes('topic'))track.artist=hit.artist;
+    if(cur&&cur.id===track.id){setArt(track);meta(track);}
+    draw();
+    return;
+  }
+  // 2. Otherwise query YouTube Music specifically for this song's cover art
+  if(track.hasYtmArt)return;
+  try{
+    const q=encodeURIComponent(`${track.artist} ${track.title}`.trim());
+    const d=await piped(`/search?q=${q}&filter=music_songs`);
+    const candidates=(d.items||[]).filter(i=>i.thumbnail).map(i=>{
+      const info=tidy(i.title,i.uploaderName);
+      return{nt:norm(info.title),na:norm(info.artist),artist:info.artist,cover:upgradeYtmUrl(i.thumbnail)};
+    });
+    ytmCovers.push(...candidates);
+    const matched=matchYtmCover(track,candidates);
+    if(matched){
+      track.thumb=matched.cover;
+      track.hasYtmArt=true;
+      if(cur&&cur.id===track.id){setArt(track);meta(track);}
+      draw();
+    }
+  }catch{}
 }
+
 const vidOf=u=>(u.match(/[?&]v=([\w-]{11})/)||[])[1];
-const mk=(id,title,up,dur,rawThumb)=>({id,...tidy(title,up),duration:dur||null,thumb:bestCover(rawThumb,id),streamId:id});
+const mk=(id,title,up,dur,rawThumb)=>{
+  const info=tidy(title,up);
+  const isSquare=rawThumb&&!rawThumb.includes('ytimg.com');
+  const t={
+    id,
+    title:info.title,
+    artist:info.artist,
+    duration:dur||null,
+    thumb:isSquare?upgradeYtmUrl(rawThumb):`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
+    hasYtmArt:Boolean(isSquare)
+  };
+  const matched=matchYtmCover(t);
+  if(matched){t.thumb=matched.cover;t.hasYtmArt=true;}
+  return t;
+};
 const fromPiped=i=>mk(vidOf(i.url),i.title,i.uploaderName,i.duration,i.thumbnail);
 const isSong=i=>vidOf(i.url||'')&&(!i.duration||(i.duration>=45&&i.duration<=720));
 
-/* ---- race all Piped mirrors simultaneously so dead servers never stall ---- */
+/* ---- race Piped mirrors, fallback to Invidious if needed ---- */
 async function piped(path){
   const ctrl=new AbortController();
-  const tm=setTimeout(()=>ctrl.abort(),5000);
+  const tm=setTimeout(()=>ctrl.abort(),4500);
   try{
-    const data=await Promise.any(PIPED.map(async base=>{
+    return await Promise.any(PIPED.map(async base=>{
       const r=await fetch(base+path,{signal:ctrl.signal});
       if(!r.ok)throw 0;
       const d=await r.json();
       if(!d||(!d.items&&!d.relatedStreams))throw 0;
       return d;
     }));
-    return data;
-  }catch{
-    throw Error('Keyless search servers are busy. Try again or add a free YouTube API key in ⚙.');
+  }finally{
+    clearTimeout(tm);
+    ctrl.abort();
+  }
+}
+
+async function invidiousSearch(q){
+  const ctrl=new AbortController();
+  const tm=setTimeout(()=>ctrl.abort(),4500);
+  try{
+    const list=await Promise.any(INVIDIOUS.map(async base=>{
+      const r=await fetch(`${base}/api/v1/search?q=${encodeURIComponent(q)}&type=video`,{signal:ctrl.signal});
+      if(!r.ok)throw 0;
+      const d=await r.json();
+      if(!Array.isArray(d)||!d.length)throw 0;
+      return d;
+    }));
+    return list
+      .filter(v=>v.videoId&&(!v.lengthSeconds||(v.lengthSeconds>=45&&v.lengthSeconds<=720)))
+      .map(v=>mk(v.videoId,v.title,v.author,v.lengthSeconds,null));
   }finally{
     clearTimeout(tm);
     ctrl.abort();
@@ -184,37 +272,31 @@ async function search(q){
     u.search=new URLSearchParams({part:'snippet',q,type:'video',videoCategoryId:10,videoEmbeddable:true,maxResults:15,key});
     const r=await fetch(u),d=await r.json();
     if(!r.ok)throw Error(d.error?.message||'YouTube API error '+r.status);
-    return d.items.map(i=>mk(i.id.videoId,dec(i.snippet.title),dec(i.snippet.channelTitle),null,i.snippet.thumbnails?.high?.url));
+    return d.items.map(i=>mk(i.id.videoId,dec(i.snippet.title),dec(i.snippet.channelTitle),null,null));
   }
-  const [songsRes,audioRes]=await Promise.allSettled([
-    piped('/search?q='+encodeURIComponent(q)+'&filter=music_songs'),
-    piped('/search?q='+encodeURIComponent(q+' audio')+'&filter=videos')
+
+  // Fetch embeddable video links for playback + YouTube Music metadata for square album covers
+  const [vidRes,ytmRes]=await Promise.allSettled([
+    piped('/search?q='+encodeURIComponent(q)+'&filter=videos'),
+    piped('/search?q='+encodeURIComponent(q)+'&filter=music_songs')
   ]);
-  const songs=songsRes.status==='fulfilled'?(songsRes.value.items||[]).filter(isSong).map(fromPiped):[];
-  const audios=audioRes.status==='fulfilled'?(audioRes.value.items||[]).filter(isSong).map(fromPiped):[];
-  altPool=audios;
 
-  const out=[],ids=new Set();
-  for(const t of [...songs,...audios]){
-    if(t.id&&!ids.has(t.id)){ids.add(t.id);out.push(t);}
+  if(ytmRes.status==='fulfilled'){
+    ytmCovers=(ytmRes.value.items||[]).filter(i=>i.thumbnail).map(i=>{
+      const info=tidy(i.title,i.uploaderName);
+      return{nt:norm(info.title),na:norm(info.artist),artist:info.artist,cover:upgradeYtmUrl(i.thumbnail)};
+    });
   }
-  if(!out.length)throw Error('No music tracks found.');
-  return out;
-}
 
-async function findExactAudio(track){
-  // 1. Check already-fetched audio uploads first (0ms)
-  const words=track.title.toLowerCase().split(/\W+/).filter(w=>w.length>2);
-  const cached=altPool.find(x=>!seen.has(x.id)&&words.some(w=>x.title.toLowerCase().includes(w)));
-  if(cached)return cached.id;
-
-  // 2. Otherwise race Piped mirrors for an audio upload of this exact song
-  if(key)return null;
-  try{
-    const d=await piped('/search?q='+encodeURIComponent(`${track.artist} ${track.title} audio`)+'&filter=videos');
-    const alt=(d.items||[]).filter(isSong).map(fromPiped).find(x=>!seen.has(x.id));
-    return alt?alt.id:null;
-  }catch{return null}
+  let tracks=[];
+  if(vidRes.status==='fulfilled'){
+    tracks=(vidRes.value.items||[]).filter(isSong).map(fromPiped);
+  }
+  if(!tracks.length){
+    tracks=await invidiousSearch(q);
+  }
+  if(!tracks.length)throw Error('No playable tracks found. Try another search.');
+  return tracks;
 }
 
 async function related(t){
@@ -227,21 +309,19 @@ async function related(t){
   return search(t.artist);
 }
 
-/* ---- playback & watchdog ---- */
-function loadStream(videoId){
+/* ---- playback & controls wired directly to the hidden embedded video ---- */
+function loadVideo(videoId){
   clearTimeout(watchdog);
   seen.add(videoId);
   if(!ready){pend=videoId;return;}
   player.loadVideoById(videoId);
   player.playVideo();
-  // Watchdog: if playback hasn't started within 4.5s, treat as blocked/stalled and move on
   watchdog=setTimeout(()=>{
     const st=player.getPlayerState?.();
-    if(st!==1&&st!==3)skip(true);
-  },4500);
+    if(st!==1&&st!==2&&st!==3)skip(true);
+  },5500);
 }
 
-/* ---- UI ---- */
 const row=t=>`<div class="row${cur&&cur.id===t.id?' active':''}" data-id="${t.id}"><img src="${esc(t.thumb)}" onerror="this.src='https://i.ytimg.com/vi/${t.id}/hqdefault.jpg'" alt=""><div><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><small>${t.duration?fmt(t.duration):''}</small></div>`;
 function draw(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
@@ -249,42 +329,49 @@ function draw(){
   $('#ls').innerHTML=L.length?L.map(row).join(''):'<p class="msg">'+(tab=='res'?'Search a song or artist to start.':'Up next queue fills automatically once a song plays.')+'</p>';
 }
 const meta=t=>{$('#mt').textContent=t.artist;$('#t1').textContent=fmt(t.duration||0)};
+
 function play(t,back){
   if(cur&&!back)hist.push(cur);
-  cur=t;triedExact=false;seen.add(t.id);$('#st').textContent='';
-  $('#deck').hidden=false;setArt(t);$('#tt').textContent=t.title;$('#t0').textContent='0:00';$('#seek').value=0;
-  meta(t);draw();document.title=t.title+' · '+t.artist;
-  loadStream(t.streamId);
-  if('mediaSession' in navigator)navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.artist,artwork:[{src:t.thumb}]});
-  related(t).then(r=>{r.forEach(x=>lib[x.id]=x);next=r.filter(x=>!seen.has(x.id));draw()}).catch(()=>{});
-}
-const skip=async bad=>{
-  clearTimeout(watchdog);
-  if(bad===true&&cur&&!triedExact){
-    triedExact=true;
-    $('#st').textContent='Switching to embeddable audio source…';
-    const altId=await findExactAudio(cur);
-    if(altId){
-      cur.streamId=altId;
-      loadStream(altId);
-      return;
-    }
+  cur=t;seen.add(t.id);$('#st').textContent='';
+  $('#deck').hidden=false;
+  setArt(t);
+  $('#tt').textContent=t.title;
+  $('#t0').textContent='0:00';
+  $('#seek').value=0;
+  meta(t);
+  draw();
+  document.title=t.title+' · '+t.artist;
+
+  loadVideo(t.id);
+  alignCover(t);
+
+  if('mediaSession' in navigator){
+    navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.artist,artwork:[{src:t.thumb}]});
   }
+  related(t).then(r=>{
+    r.forEach(x=>lib[x.id]=x);
+    next=r.filter(x=>!seen.has(x.id));
+    draw();
+  }).catch(()=>{});
+}
+
+const skip=bad=>{
+  clearTimeout(watchdog);
   const L=bad===true?[...results,...next]:[...next,...results];
   const n=L.find(x=>!seen.has(x.id));
   if(n)play(n);
-  else $('#st').textContent='No embeddable versions left for that search.';
+  else if(bad===true)$('#st').textContent='No more embeddable tracks in this list.';
 };
 
 window.onYouTubeIframeAPIReady=()=>{
-  const pv={playsinline:1,rel:0,enablejsapi:1,controls:0,disablekb:1};
+  const pv={autoplay:1,playsinline:1,rel:0,enablejsapi:1,controls:0,disablekb:1,fs:0,iv_load_policy:3};
   if(location.origin.startsWith('http')){pv.origin=location.origin;pv.widget_referrer=location.href;}
   player=new YT.Player('yt',{width:'200',height:'200',playerVars:pv,events:{
     onReady(){
       const ifr=player.getIframe?.();
       if(ifr)ifr.referrerPolicy='strict-origin-when-cross-origin';
       ready=1;
-      if(pend)loadStream(pend);
+      if(pend)loadVideo(pend);
     },
     onStateChange(e){
       $('#pp').textContent=e.data==1?'⏸':'▶';
@@ -293,8 +380,9 @@ window.onYouTubeIframeAPIReady=()=>{
         fails=0;$('#st').textContent='';
         const d=player.getDuration()|0;
         if(cur&&d){cur.duration=d;meta(cur)}
+      }else if(e.data==2){
+        clearTimeout(watchdog);
       }else if(e.data==3){
-        // Give slow buffering 8s before timing out
         clearTimeout(watchdog);
         watchdog=setTimeout(()=>{if(player.getPlayerState?.()!==1)skip(true)},8000);
       }else if(e.data==5||e.data==-1){
@@ -307,7 +395,7 @@ window.onYouTubeIframeAPIReady=()=>{
       clearTimeout(watchdog);
       fails++;
       if(fails>=5){
-        $('#st').textContent=`Playback blocked (Error ${e.data}). Run on http://localhost or HTTPS and disable Referer-blocking extensions.`;
+        $('#st').textContent=`YouTube blocked playback (Error ${e.data}). Serve over http://localhost or HTTPS and disable extensions that block Referer headers.`;
         return;
       }
       skip(true);
@@ -316,7 +404,7 @@ window.onYouTubeIframeAPIReady=()=>{
 };
 const ys=document.createElement('script');ys.src='https://www.youtube.com/iframe_api';document.head.append(ys);
 
-/* ---- scrubber & volume ---- */
+/* ---- scrubber & volume synced to hidden player ---- */
 setInterval(()=>{
   if(!ready||drag||player.getPlayerState?.()!==1)return;
   const c=player.getCurrentTime()||0,d=player.getDuration()||0;
@@ -329,7 +417,7 @@ $('#mut').onclick=()=>{if(!ready)return;if(player.isMuted()){player.unMute();$('
 
 $('#f').onsubmit=async e=>{
   e.preventDefault();const q=$('#q').value.trim();if(!q)return;
-  fails=0;seen.clear();$('#st').textContent='Finding tracks…';
+  fails=0;seen.clear();ytmCovers=[];$('#st').textContent='Searching…';
   try{
     results=await search(q);results.forEach(x=>lib[x.id]=x);
     tab='res';draw();$('#st').textContent='';
@@ -342,7 +430,7 @@ $('#pp').onclick=()=>ready&&(player.getPlayerState()==1?player.pauseVideo():play
 $('#nt').onclick=()=>{fails=0;skip()};
 $('#pv').onclick=()=>{if(!ready)return;if(player.getCurrentTime()>3||!hist.length)player.seekTo(0);else play(hist.pop(),true)};
 $('#gear').onclick=()=>$('#set').hidden=!$('#set').hidden;
-$('#ks').onclick=e=>{e.preventDefault();key=$('#key').value.trim()||BUILT_IN_KEY;LS.set('key',$('#key').value.trim());$('#set').hidden=true;$('#st').textContent=key?'Using your YouTube API key for search.':'Using keyless search.'};
+$('#ks').onclick=e=>{e.preventDefault();key=$('#key').value.trim()||BUILT_IN_KEY;LS.set('key',$('#key').value.trim());$('#set').hidden=true;$('#st').textContent=key?'Using your YouTube API key.':'Using keyless search.'};
 if('mediaSession' in navigator){
   navigator.mediaSession.setActionHandler('nexttrack',()=>{fails=0;skip()});
   navigator.mediaSession.setActionHandler('play',()=>player.playVideo());
