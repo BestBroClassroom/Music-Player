@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Embed Player</title>
 <style>
 :root{--bg:#1c1830;--sf:#272142;--ln:#3a3260;--tx:#f3effa;--mu:#a79fc4;--ac:#ffb347}
@@ -29,7 +30,7 @@ aside{position:sticky;top:16px}
 #hero small{color:var(--mu)}
 #tt{font:700 30px/1.15 Georgia,serif;overflow-wrap:anywhere}
 #mt{color:var(--mu)}
-#st{color:var(--mu);min-height:1.4em}
+#st{color:var(--mu);min-height:1.4em;margin-bottom:4px}
 nav{display:flex;gap:4px;border-bottom:1px solid var(--ln);margin:8px 0}
 nav button{background:none;padding:8px 14px;color:var(--mu);border-bottom:2px solid transparent}
 nav button.on{color:var(--tx);border-color:var(--ac)}
@@ -75,7 +76,7 @@ const PIPED=['https://pipedapi.kavin.rocks','https://pipedapi.leptons.xyz','http
 
 const $=s=>document.querySelector(s);
 const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
-let key=LS.get('key','')||BUILT_IN_KEY,pi=0,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={};
+let key=LS.get('key','')||BUILT_IN_KEY,pi=0,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},fails=0;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=s=>s?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'';
 const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.value};
@@ -113,11 +114,12 @@ async function search(q){
     return d.items.map(i=>mk(i.id.videoId,dec(i.snippet.title),dec(i.snippet.channelTitle)));
   }
   const e=encodeURIComponent(q),ok=d=>(d.items||[]).filter(i=>vidOf(i.url||''));
-  let it=ok(await piped('/search?q='+e+'&filter=music_songs'));
-  if(!it.length)it=ok(await piped('/search?q='+e+'&filter=videos'));
+  // Prefer standard videos over music_songs to avoid label-blocked Topic tracks
+  let it=ok(await piped('/search?q='+e+'&filter=videos'));
+  if(!it.length)it=ok(await piped('/search?q='+e+'&filter=music_songs'));
   return it.map(fromPiped);
 }
-async function related(t){ // YouTube's own related videos via Piped, else more from the same artist
+async function related(t){
   if(!key){
     try{
       const d=await piped('/streams/'+t.id);
@@ -143,27 +145,53 @@ function play(t,back){
   if('mediaSession' in navigator)navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.artist,artwork:[{src:t.thumb}]});
   related(t).then(r=>{r.forEach(x=>lib[x.id]=x);next=r.filter(x=>!seen.has(x.id));draw()}).catch(()=>{});
 }
-const skip=bad=>{
+const skip=(bad,code)=>{
   const L=bad===true?[...results,...next]:[...next,...results];
   const n=L.find(x=>!seen.has(x.id));
-  if(n){play(n);if(bad===true)$('#st').textContent='That video can’t be embedded, so I skipped to the next one.'}
+  if(n){
+    play(n);
+    if(bad===true)$('#st').textContent=`That video can’t be embedded (Error ${code||'152'}), skipped to the next one.`;
+  }else if(bad===true){
+    $('#st').textContent='No embeddable tracks left in this list. Try another search.';
+  }
 };
 
 window.onYouTubeIframeAPIReady=()=>{
-  player=new YT.Player('yt',{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0},events:{
-    onReady(){ready=1;if(pend)player.loadVideoById(pend.id)},
+  const pv={playsinline:1,rel:0,enablejsapi:1};
+  if(location.origin.startsWith('http')){
+    pv.origin=location.origin;
+    pv.widget_referrer=location.href;
+  }
+  player=new YT.Player('yt',{width:'100%',height:'100%',playerVars:pv,events:{
+    onReady(){
+      const ifr=player.getIframe?.();
+      if(ifr)ifr.referrerPolicy='strict-origin-when-cross-origin';
+      ready=1;
+      if(pend)player.loadVideoById(pend.id);
+    },
     onStateChange(e){
       $('#pp').textContent=e.data==1?'⏸':'▶';
-      if(e.data==1&&cur&&!cur.duration){cur.duration=player.getDuration()|0;meta(cur)}
+      if(e.data==1){
+        fails=0;
+        if(cur&&!cur.duration){cur.duration=player.getDuration()|0;meta(cur)}
+      }
       if(e.data==0)skip();
     },
-    onError(){skip(true)}
+    onError(e){
+      fails++;
+      if(fails>=3){
+        $('#st').textContent=`YouTube blocked playback (Error ${e.data}). Serve this page over http://localhost or HTTPS and disable extensions that strip Referer headers.`;
+        return;
+      }
+      skip(true,e.data);
+    }
   }});
 };
 const ys=document.createElement('script');ys.src='https://www.youtube.com/iframe_api';document.head.append(ys);
 
 $('#f').onsubmit=async e=>{
   e.preventDefault();const q=$('#q').value.trim();if(!q)return;
+  fails=0;seen.clear();
   $('#st').textContent='Searching…';
   try{
     results=await search(q);results.forEach(x=>lib[x.id]=x);
@@ -171,19 +199,19 @@ $('#f').onsubmit=async e=>{
     if(results[0])play(results[0]);
   }catch(x){$('#st').textContent=x.message}
 };
-$('#ls').onclick=e=>{const r=e.target.closest('.row');if(r)play(lib[r.dataset.id])};
+$('#ls').onclick=e=>{const r=e.target.closest('.row');if(r){fails=0;play(lib[r.dataset.id])}};
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;draw()});
 $('#pp').onclick=()=>ready&&(player.getPlayerState()==1?player.pauseVideo():player.playVideo());
-$('#nt').onclick=skip;
+$('#nt').onclick=()=>{fails=0;skip()};
 $('#pv').onclick=()=>{if(!ready)return;if(player.getCurrentTime()>3||!hist.length)player.seekTo(0);else play(hist.pop(),true)};
 $('#gear').onclick=()=>$('#set').hidden=!$('#set').hidden;
 $('#ks').onclick=e=>{e.preventDefault();key=$('#key').value.trim()||BUILT_IN_KEY;LS.set('key',$('#key').value.trim());$('#set').hidden=true;$('#st').textContent=key?'Using your YouTube API key for search.':'Using keyless search.'};
 if('mediaSession' in navigator){
-  navigator.mediaSession.setActionHandler('nexttrack',skip);
+  navigator.mediaSession.setActionHandler('nexttrack',()=>{fails=0;skip()});
   navigator.mediaSession.setActionHandler('play',()=>player.playVideo());
   navigator.mediaSession.setActionHandler('pause',()=>player.pauseVideo());
 }
-if(location.protocol=='file:')$('#st').textContent='YouTube blocks embeds on file:// pages. Upload this to your host (or serve it locally) to play.';
+if(location.protocol=='file:')$('#st').textContent='YouTube blocks embeds on file:// pages. Serve this locally (e.g. npx serve or python -m http.server) or upload to a web host.';
 draw();
 </script>
 </body>
