@@ -9,44 +9,42 @@
 :root{--bg:#1c1830;--sf:#272142;--ln:#3a3260;--tx:#f3effa;--mu:#a79fc4;--ac:#ffb347}
 *{box-sizing:border-box;margin:0}
 body{font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:20px 16px}
-button{font:inherit;cursor:pointer;border:0}
+button,select{font:inherit;cursor:pointer;border:0}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-.app{max-width:740px;margin:auto}
-#f{display:flex;gap:8px;margin-bottom:14px}
-#q,#key{flex:1;min-width:0;background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:11px 14px;color:var(--tx);font:inherit}
+.app{max-width:820px;margin:auto}
+#f{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+#q,#key,#chan{flex:1;min-width:180px;background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:11px 14px;color:var(--tx);font:inherit}
 #f button,#ks{background:var(--ac);color:#201400;border-radius:10px;padding:11px 18px;font-weight:600}
 #f .ghost{background:none;color:var(--mu);border:1px solid var(--ln);padding:11px 13px}
-#set{margin-bottom:14px;padding:12px;background:var(--sf);border-radius:10px;display:flex;flex-wrap:wrap;gap:8px}
-#set small{flex-basis:100%;color:var(--mu)}
+#set{margin-bottom:14px;padding:14px;background:var(--sf);border:1px solid var(--ln);border-radius:12px;display:grid;gap:10px}
+.set-row{display:flex;gap:8px;flex-wrap:wrap}
+#set small{color:var(--mu);line-height:1.4}
 
-/* Pure audio deck: 200x200 hidden video iframe stays permanently behind the 200x200 album cover */
 #deck{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:18px;margin-bottom:14px;display:flex;gap:20px;align-items:center}
-@media(max-width:580px){#deck{flex-direction:column;text-align:center}}
-#cover-box{position:relative;width:200px;height:200px;flex:none;border-radius:12px;overflow:hidden;background:#120f20;box-shadow:0 8px 24px rgba(0,0,0,.35)}
-#cover-box iframe{position:absolute;inset:0;width:200px;height:200px;border:0;z-index:1;pointer-events:none}
-#art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;background:var(--bg)}
-#art.crop43{transform:scale(1.36)}
-
+@media(max-width:680px){#deck{flex-direction:column;text-align:center}}
+#art{width:160px;height:160px;flex:none;border-radius:12px;object-fit:cover;background:#120f20;box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .info{flex:1;min-width:0;width:100%}
 .badge{color:var(--ac);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:11px}
-#tt{font:700 24px/1.2 Georgia,serif;overflow-wrap:anywhere;margin:4px 0}
+#tt{font:700 23px/1.2 Georgia,serif;overflow-wrap:anywhere;margin:4px 0}
 #mt{color:var(--mu);font-size:14px}
 
-.scrub{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:12px;color:var(--mu);font-variant-numeric:tabular-nums}
+.scrub{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:12px;color:var(--mu);font-variant-numeric:tabular-nums}
 .scrub input,#vol{accent-color:var(--ac);cursor:pointer}
 #seek{flex:1}
 .ctl{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
-@media(max-width:580px){.ctl{justify-content:center;flex-wrap:wrap}}
+@media(max-width:680px){.ctl{justify-content:center;flex-wrap:wrap}}
 .btns{display:flex;align-items:center;gap:10px}
 .btns button,#mut{width:40px;height:40px;border-radius:50%;font-size:16px;background:var(--bg);color:var(--tx)}
 #pp{width:48px;height:48px;font-size:18px;background:var(--ac)!important;color:#201400!important}
 .volbox{display:flex;align-items:center;gap:6px}
 #vol{width:84px}
 
-#st{color:var(--mu);font-size:13px;min-height:1.3em;margin-bottom:6px}
-nav{display:flex;gap:4px;border-bottom:1px solid var(--ln);margin:8px 0}
-nav button{background:none;padding:8px 14px;color:var(--mu);border-bottom:2px solid transparent}
-nav button.on{color:var(--tx);border-color:var(--ac)}
+/* Compliant visible 200x200 YouTube frame (only shown when playing a YouTube source) */
+#yt-wrap{width:200px;height:200px;flex:none;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--ln)}
+#yt-wrap[hidden]{display:none}
+#yt-wrap iframe{width:200px;height:200px;border:0}
+
+#st{color:var(--mu);font-size:13px;min-height:1.3em;margin-bottom:8px}
 .row{display:flex;gap:12px;align-items:center;padding:8px;border-radius:10px;cursor:pointer}
 .row:hover,.row.active{background:var(--sf)}
 .row img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg)}
@@ -59,23 +57,32 @@ nav button.on{color:var(--tx);border-color:var(--ac)}
 <body>
 <div class="app">
   <form id="f">
-    <input id="q" placeholder="Search a song or artist" autocomplete="off" autofocus>
+    <input id="q" placeholder="Search a song or artist…" autocomplete="off" autofocus>
     <button type="submit">Search</button>
-    <button type="button" id="gear" class="ghost" title="Settings" aria-label="Settings">⚙</button>
+    <button type="button" id="gear" class="ghost" title="Source Settings" aria-label="Source Settings">⚙</button>
   </form>
+
   <div id="set" hidden>
-    <input id="key" type="password" placeholder="YouTube Data API key (optional)" autocomplete="off">
-    <button type="button" id="ks">Save</button>
-    <small>Optional: add a free YouTube Data API v3 key for instant search, or leave blank for automatic keyless search.</small>
+    <div class="set-row">
+      <input id="key" type="password" placeholder="YouTube Data API v3 key (leave blank for keyless Audius audio)" autocomplete="off">
+      <select id="chan" aria-label="YouTube Channel Filter">
+        <option value="lyric_query">YouTube: Lyric & Audio Uploads (Recommended)</option>
+        <option value="UCNqFDjYTexJdet3rPDrmJKg">Channel: 7clouds (Lyric Videos)</option>
+        <option value="UC-9-kyTW8ZkZNDHQJ6FgpwQ">Channel: Music Topic / General</option>
+        <option value="all">YouTube: All Embeddable Videos</option>
+      </select>
+      <button type="button" id="ks">Save</button>
+    </div>
+    <small>
+      • <b>No API key:</b> Searches and plays direct audio streams from <b>Audius</b> (native &lt;audio&gt;, zero iframe errors).<br>
+      • <b>With a YouTube Data API v3 key:</b> Searches embeddable lyric uploads or a specific lyric channel and plays via a compliant visible 200×200 player.
+    </small>
   </div>
 
   <div id="deck" hidden>
-    <div id="cover-box">
-      <div id="yt"></div>
-      <img id="art" alt="Album cover">
-    </div>
+    <img id="art" alt="Cover art">
     <div class="info">
-      <span class="badge" id="state-badge">Now playing</span>
+      <span class="badge" id="badge">Now playing</span>
       <h1 id="tt"></h1>
       <p id="mt"></p>
       <div class="scrub">
@@ -95,609 +102,273 @@ nav button.on{color:var(--tx);border-color:var(--ac)}
         </div>
       </div>
     </div>
+    <div id="yt-wrap" hidden><div id="yt"></div></div>
   </div>
 
   <div id="st"></div>
-  <nav><button type="button" data-t="res" class="on">Tracks</button><button type="button" data-t="nx">Up next</button></nav>
   <div id="ls"></div>
 </div>
 
-<script>
-const BUILT_IN_KEY='';
-let PIPED=[
-  'https://pipedapi.kavin.rocks',
-  'https://api.piped.private.coffee',
-  'https://pipedapi.adminforge.de',
-  'https://pipedapi.leptons.xyz',
-  'https://pipedapi.nosebs.ru',
-  'https://pipedapi.orangenet.cc',
-  'https://pipedapi.tokhmi.xyz',
-  'https://pipedapi.moomoo.me'
-];
-let INVIDIOUS=[
-  'https://inv.nadeko.net',
-  'https://invidious.nerdvpn.de',
-  'https://yt.artemislena.eu',
-  'https://invidious.fdn.fr',
-  'https://iv.datura.network',
-  'https://invidious.perennialte.ch'
-];
+<audio id="aud" preload="auto"></audio>
 
+<script>
 const $=s=>document.querySelector(s);
 const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
-let key=LS.get('key','')||BUILT_IN_KEY,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},ytmCovers=[],fails=0,drag=0,userMuted=false,kickTimer=null,verifyTimer=null,playToken=0,altQueue=[];
-const badIds=new Set();
 
+let ytKey=LS.get('yt_key','');
+let ytChan=LS.get('yt_chan','lyric_query');
+$('#key').value=ytKey;
+$('#chan').value=ytChan;
+
+let audiusHost='https://discoveryprovider.audius.co';
+let ytPlayer=null,ytReady=0,ytPending=null;
+let tracks=[],idx=-1,drag=0,activeEngine='audius';
+
+const aud=$('#aud');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=s=>s>=0?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'0:00';
 const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.value};
 
-/* ---- discover live Piped & Invidious instances in background ---- */
-(async function discoverInstances(){
+/* ---- Discover fastest healthy Audius node ---- */
+(async()=>{
   try{
-    const r=await fetch('https://piped-instances.kavin.rocks/',{signal:AbortSignal.timeout(5000)});
-    if(r.ok){
-      const list=await r.json();
-      const urls=list.map(x=>x.api_url).filter(u=>typeof u==='string'&&u.startsWith('https://'));
-      if(urls.length)PIPED=[...new Set([...urls,...PIPED])].slice(0,12);
-    }
-  }catch{}
-  try{
-    const r=await fetch('https://api.invidious.io/instances.json?sort_by=health',{signal:AbortSignal.timeout(5000)});
-    if(r.ok){
-      const list=await r.json();
-      const urls=list
-        .filter(([,meta])=>meta&&meta.type==='https'&&meta.api&&meta.cors)
-        .map(([,meta])=>meta.uri.replace(/\/$/,''));
-      if(urls.length)INVIDIOUS=[...new Set([...urls,...INVIDIOUS])].slice(0,10);
-    }
+    const r=await fetch('https://api.audius.co',{signal:AbortSignal.timeout(4000)});
+    const d=await r.json();
+    if(Array.isArray(d.data)&&d.data[0])audiusHost=d.data[0];
   }catch{}
 })();
 
-/* ---- title cleaning & YouTube Music cover alignment ---- */
-const JUNK=/\s*[\(\[][^\)\]]*(official|audio|lyric|video|visuali[sz]er|remaster|hd|4k|hq|live|version|explicit)[^\)\]]*[\)\]]/ig;
-const STOP=new Set(['the','and','for','with','feat','ft','official','audio','video','live','version','cover','like','from','song','music','lyrics']);
-
-function tidy(title,up){
-  let a=(up||'').replace(/\s*-\s*Topic$|VEVO$/i,'').trim();
-  let t=(title||'').replace(JUNK,'').trim();
-  const k=t.indexOf(' - ');
-  if(k>0){a=t.slice(0,k).trim();t=t.slice(k+3).trim()}
-  return{title:t,artist:a};
-}
-const norm=s=>(s||'').toLowerCase().replace(JUNK,'').replace(/\b(ft|feat|featuring)\b.*/g,'').replace(/[^a-z0-9\u00c0-\u024f]+/g,' ').trim();
-const tokens=s=>norm(s).split(' ').filter(w=>w.length>=3&&!STOP.has(w));
-const isMajorOfficial=up=>/VEVO$|\s-\sTopic$/i.test(up||'');
-
-function cleanQueryForCover(track){
-  const qm=track.title.match(/['"‘“]([^'"’”]{2,})['"’”]/);
-  if(qm)return qm[1];
-  return `${track.artist} ${track.title}`.replace(/\b(like a version|triple j|cover|live)\b/ig,'').trim();
+/* ---- Search Providers (Single direct API call, zero retry loops) ---- */
+async function searchAudius(q){
+  const u=`${audiusHost}/v1/tracks/search?query=${encodeURIComponent(q)}&limit=20&app_name=WebAudioPlayer`;
+  const r=await fetch(u,{signal:AbortSignal.timeout(8000)});
+  if(!r.ok)throw Error('Audius search error '+r.status);
+  const d=await r.json();
+  return (d.data||[]).filter(t=>t.is_streamable!==false).map(t=>({
+    engine:'audius',
+    id:t.id,
+    title:t.title,
+    artist:t.user?.name||'Unknown Artist',
+    duration:t.duration||0,
+    thumb:t.artwork?.['480x480']||t.artwork?.['150x150']||'',
+    streamUrl:`${audiusHost}/v1/tracks/${t.id}/stream?app_name=WebAudioPlayer`
+  }));
 }
 
-function upgradeYtmUrl(raw){
-  if(!raw)return '';
-  if(/=w\d+-h\d+/.test(raw))return raw.replace(/=w\d+-h\d+[^&?]*/,'=w544-h544-l90-rj');
-  if(/=s\d+/.test(raw))return raw.replace(/=s\d+[^&?]*/,'=s544');
-  return raw;
-}
-
-function matchYtmCover(track,pool=ytmCovers){
-  if(!pool.length)return null;
-  const nt=norm(track.title);
-  const tTok=tokens(track.title);
-  const aTok=tokens(track.artist);
-  if(!nt||!tTok.length)return null;
-
-  let best=null,bestScore=0;
-  for(const c of pool){
-    if(!c.nt||!c.tTok.length)continue;
-    let score=0;
-    if(c.nt===nt&&nt.length>=4){
-      score+=6;
-    }else{
-      const sharedTitle=tTok.filter(w=>c.tTok.includes(w)).length;
-      const ratio=sharedTitle/Math.max(tTok.length,c.tTok.length);
-      if(sharedTitle>=2||ratio>=0.6)score+=sharedTitle*2.5;
-    }
-    const sharedArtist=aTok.filter(w=>c.aTok.includes(w)||c.tTok.includes(w)).length;
-    if(sharedArtist>=1)score+=sharedArtist*2;
-
-    if(score>bestScore){bestScore=score;best=c;}
+async function searchYouTube(q){
+  const params={
+    part:'snippet',
+    type:'video',
+    videoEmbeddable:'true',
+    maxResults:'20',
+    key:ytKey
+  };
+  if(ytChan==='lyric_query'){
+    params.q=`${q} lyrics`;
+  }else if(ytChan==='all'){
+    params.q=q;
+    params.videoCategoryId='10';
+  }else{
+    params.q=q;
+    params.channelId=ytChan;
   }
-  return bestScore>=4.5?best:null;
+  const u=new URL('https://www.googleapis.com/youtube/v3/search');
+  u.search=new URLSearchParams(params);
+  const r=await fetch(u,{signal:AbortSignal.timeout(8000)});
+  const d=await r.json();
+  if(!r.ok)throw Error(d.error?.message||'YouTube API error '+r.status);
+  return (d.items||[]).map(i=>({
+    engine:'youtube',
+    id:i.id.videoId,
+    title:dec(i.snippet.title),
+    artist:dec(i.snippet.channelTitle),
+    duration:0,
+    thumb:i.snippet.thumbnails?.high?.url||`https://i.ytimg.com/vi/${i.id.videoId}/hqdefault.jpg`
+  }));
 }
 
-function setArt(t){
-  const img=$('#art');
-  img.className='';
-  const fallback=`https://i.ytimg.com/vi/${t.id}/hqdefault.jpg`;
-  img.onerror=()=>{
-    img.onerror=null;
-    img.className='crop43';
-    img.src=fallback;
-  };
-  img.onload=()=>{
-    if(img.src.includes('maxresdefault')&&img.naturalWidth<=120){
-      img.className='crop43';
-      img.src=fallback;
-    }else if(!t.hasYtmArt&&img.naturalWidth>img.naturalHeight){
-      img.className='crop43';
-    }
-  };
-  img.src=t.thumb;
-}
-
-async function alignCover(track){
-  const hit=matchYtmCover(track);
-  if(hit){
-    track.thumb=hit.cover;
-    track.hasYtmArt=true;
-    if(cur&&cur.id===track.id)setArt(track);
-    draw();
+/* ---- UI Rendering ---- */
+function renderList(){
+  if(!tracks.length){
+    $('#ls').innerHTML='<p class="msg">Search a song or artist above to start listening.</p>';
     return;
   }
-  if(track.hasYtmArt)return;
-  try{
-    const q=encodeURIComponent(cleanQueryForCover(track));
-    const d=await piped(`/search?q=${q}&filter=music_songs`);
-    const candidates=(d.items||[]).filter(i=>i.thumbnail).map(i=>{
-      const info=tidy(i.title,i.uploaderName);
-      return{nt:norm(info.title),tTok:tokens(info.title),aTok:tokens(info.artist),cover:upgradeYtmUrl(i.thumbnail)};
-    });
-    ytmCovers.push(...candidates);
-    const matched=matchYtmCover(track,candidates);
-    if(matched){
-      track.thumb=matched.cover;
-      track.hasYtmArt=true;
-      if(cur&&cur.id===track.id)setArt(track);
-      draw();
-    }
-  }catch{}
+  $('#ls').innerHTML=tracks.map((t,i)=>`
+    <div class="row${i===idx?' active':''}" data-i="${i}">
+      <img src="${esc(t.thumb)}" alt="">
+      <div><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div>
+      <small>${t.duration?fmt(t.duration):''}</small>
+    </div>
+  `).join('');
 }
 
-const vidOf=u=>(u.match(/[?&]v=([\w-]{11})/)||[])[1];
-const mk=(id,title,up,dur,rawThumb)=>{
-  const info=tidy(title,up);
-  const isSquare=rawThumb&&!rawThumb.includes('ytimg.com');
-  const t={
-    id,
-    streamId:id,
-    rawUploader:up||'',
-    title:info.title,
-    artist:info.artist,
-    duration:dur||null,
-    thumb:isSquare?upgradeYtmUrl(rawThumb):`https://i.ytimg.com/vi/${id}/maxresdefault.jpg`,
-    hasYtmArt:Boolean(isSquare)
-  };
-  const matched=matchYtmCover(t);
-  if(matched){t.thumb=matched.cover;t.hasYtmArt=true;}
-  return t;
-};
-const fromPiped=i=>mk(vidOf(i.url),i.title,i.uploaderName,i.duration,i.thumbnail);
-const isSong=i=>vidOf(i.url||'')&&(!i.duration||(i.duration>=45&&i.duration<=720));
-
-/* ---- 3-tier keyless search: Piped -> Invidious -> Direct YouTube HTML ---- */
-async function piped(path){
-  const ctrl=new AbortController();
-  const tm=setTimeout(()=>ctrl.abort(),8000);
-  try{
-    return await Promise.any(PIPED.map(async base=>{
-      const r=await fetch(base+path,{signal:ctrl.signal});
-      if(!r.ok)throw 0;
-      const d=await r.json();
-      if(!d||(!d.items&&!d.relatedStreams))throw 0;
-      return d;
-    }));
-  }finally{
-    clearTimeout(tm);
-  }
+function stopAll(){
+  aud.pause();
+  aud.removeAttribute('src');
+  if(ytReady&&ytPlayer?.stopVideo)ytPlayer.stopVideo();
 }
 
-async function invidiousSearch(q){
-  const ctrl=new AbortController();
-  const tm=setTimeout(()=>ctrl.abort(),8000);
-  try{
-    const list=await Promise.any(INVIDIOUS.map(async base=>{
-      const r=await fetch(`${base}/api/v1/search?q=${encodeURIComponent(q)}&type=video`,{signal:ctrl.signal});
-      if(!r.ok)throw 0;
-      const d=await r.json();
-      if(!Array.isArray(d)||!d.length)throw 0;
-      return d;
-    }));
-    return list
-      .filter(v=>v.videoId&&(!v.lengthSeconds||(v.lengthSeconds>=45&&v.lengthSeconds<=720)))
-      .map(v=>mk(v.videoId,v.title,v.author,v.lengthSeconds,null));
-  }finally{
-    clearTimeout(tm);
-  }
-}
+function playAt(i){
+  if(i<0||i>=tracks.length)return;
+  idx=i;
+  const t=tracks[i];
+  activeEngine=t.engine;
+  stopAll();
 
-function extractBalancedJson(text,marker){
-  const idx=text.indexOf(marker);
-  if(idx<0)return null;
-  const start=text.indexOf('{',idx);
-  if(start<0)return null;
-  let depth=0,inStr=false,escNext=false;
-  for(let i=start;i<text.length;i++){
-    const ch=text[i];
-    if(inStr){
-      if(escNext)escNext=false;
-      else if(ch==='\\')escNext=true;
-      else if(ch==='"')inStr=false;
-    }else{
-      if(ch==='"')inStr=true;
-      else if(ch==='{')depth++;
-      else if(ch==='}'){
-        depth--;
-        if(depth===0){
-          try{return JSON.parse(text.slice(start,i+1))}catch{return null}
-        }
-      }
-    }
-  }
-  return null;
-}
-
-function collectVideos(node,out=[],seenIds=new Set()){
-  if(!node||typeof node!=='object'||out.length>=18)return out;
-  if(node.videoRenderer&&node.videoRenderer.videoId){
-    const v=node.videoRenderer;
-    if(!seenIds.has(v.videoId)){
-      seenIds.add(v.videoId);
-      const title=v.title?.runs?.map(r=>r.text).join('')||'';
-      const artist=v.ownerText?.runs?.map(r=>r.text).join('')||'';
-      const durTxt=v.lengthText?.simpleText||'';
-      const parts=durTxt.split(':').map(Number);
-      const dur=parts.length===2?parts[0]*60+parts[1]:parts.length===3?parts[0]*3600+parts[1]*60+parts[2]:null;
-      if(!dur||(dur>=45&&dur<=720)){
-        out.push(mk(v.videoId,title,artist,dur,null));
-      }
-    }
-    return out;
-  }
-  for(const k of Object.keys(node)){
-    collectVideos(node[k],out,seenIds);
-    if(out.length>=18)break;
-  }
-  return out;
-}
-
-async function youtubeDirectSearch(q){
-  const target=`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
-  const proxies=[
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}`
-  ];
-  const ctrl=new AbortController();
-  const tm=setTimeout(()=>ctrl.abort(),9000);
-  try{
-    return await Promise.any(proxies.map(async u=>{
-      const r=await fetch(u,{signal:ctrl.signal});
-      if(!r.ok)throw 0;
-      const html=await r.text();
-      const data=extractBalancedJson(html,'var ytInitialData =')||extractBalancedJson(html,'window["ytInitialData"] =');
-      const items=collectVideos(data);
-      if(!items.length)throw 0;
-      return items;
-    }));
-  }finally{
-    clearTimeout(tm);
-  }
-}
-
-async function search(q){
-  if(key){
-    try{
-      const u=new URL('https://www.googleapis.com/youtube/v3/search');
-      u.search=new URLSearchParams({part:'snippet',q,type:'video',videoCategoryId:10,videoEmbeddable:true,maxResults:15,key});
-      const r=await fetch(u),d=await r.json();
-      if(!r.ok)throw Error(d.error?.message||'YouTube API error '+r.status);
-      return d.items.map(i=>mk(i.id.videoId,dec(i.snippet.title),dec(i.snippet.channelTitle),null,null));
-    }catch(err){
-      $('#st').textContent=`API key error (${err.message}) — falling back to keyless search…`;
-    }
-  }
-
-  // Search standard videos, lyric uploads (embeddable for major-label artists), and YouTube Music covers in parallel
-  const [vidRes,lyrRes,ytmRes]=await Promise.allSettled([
-    piped('/search?q='+encodeURIComponent(q)+'&filter=videos'),
-    piped('/search?q='+encodeURIComponent(q+' lyrics')+'&filter=videos'),
-    piped('/search?q='+encodeURIComponent(q)+'&filter=music_songs')
-  ]);
-
-  if(ytmRes.status==='fulfilled'){
-    ytmCovers=(ytmRes.value.items||[]).filter(i=>i.thumbnail).map(i=>{
-      const info=tidy(i.title,i.uploaderName);
-      return{nt:norm(info.title),tTok:tokens(info.title),aTok:tokens(info.artist),cover:upgradeYtmUrl(i.thumbnail)};
-    });
-  }
-
-  const raw=[];
-  const seenLocal=new Set();
-  for(const res of [lyrRes,vidRes]){
-    if(res.status!=='fulfilled')continue;
-    for(const item of (res.value.items||[]).filter(isSong)){
-      const t=fromPiped(item);
-      if(t.id&&!seenLocal.has(t.id)){
-        seenLocal.add(t.id);
-        raw.push(t);
-      }
-    }
-  }
-
-  let tracks=raw;
-  if(!tracks.length){
-    try{tracks=await invidiousSearch(q+' lyrics')}catch{}
-  }
-  if(!tracks.length){
-    try{tracks=await youtubeDirectSearch(q+' lyrics')}catch{}
-  }
-  if(!tracks.length)throw Error('Search mirrors are busy right now. Try again in a moment or add a free YouTube API key in ⚙.');
-
-  // Put embeddable non-VEVO/non-Topic uploads first so major-label tracks play immediately
-  tracks.sort((a,b)=>(isMajorOfficial(a.rawUploader)?1:0)-(isMajorOfficial(b.rawUploader)?1:0));
-  return tracks;
-}
-
-/* ---- find embeddable lyric/audio/live uploads of the exact song when official VEVO/Topic is 152-4 blocked ---- */
-async function gatherAltCandidates(track){
-  const tTok=tokens(track.title);
-  const queries=[
-    `${track.artist} ${track.title} lyrics`,
-    `${track.artist} ${track.title} audio`,
-    `${track.artist} ${track.title} live`
-  ];
-  const pool=[];
-  const seenLocal=new Set([track.id,track.streamId,...badIds]);
-
-  await Promise.allSettled(queries.map(async q=>{
-    let items=[];
-    try{
-      const d=await piped('/search?q='+encodeURIComponent(q)+'&filter=videos');
-      items=(d.items||[]).filter(isSong).map(fromPiped);
-    }catch{
-      try{items=await youtubeDirectSearch(q)}catch{}
-    }
-    for(const cand of items){
-      if(seenLocal.has(cand.id)||badIds.has(cand.id))continue;
-      seenLocal.add(cand.id);
-      const cTok=tokens(cand.title);
-      const titleMatch=!tTok.length||tTok.some(w=>cTok.includes(w));
-      const durOk=!track.duration||!cand.duration||Math.abs(track.duration-cand.duration)<=50;
-      if(titleMatch&&durOk)pool.push(cand);
-    }
-  }));
-
-  pool.sort((a,b)=>(isMajorOfficial(a.rawUploader)?1:0)-(isMajorOfficial(b.rawUploader)?1:0));
-  return pool.slice(0,5).map(x=>x.id);
-}
-
-async function related(t){
-  if(!key){
-    try{
-      const d=await piped('/streams/'+t.id);
-      return (d.relatedStreams||[]).filter(isSong).map(fromPiped);
-    }catch{}
-  }
-  return search(t.artist);
-}
-
-/* ---- playback & silent 152-4 detection (video stays permanently behind album cover) ---- */
-function clearTimers(){
-  clearTimeout(kickTimer);
-  clearTimeout(verifyTimer);
-}
-
-function loadVideo(videoId){
-  clearTimers();
-  seen.add(videoId);
-  $('#state-badge').textContent='Loading audio…';
-  if(!ready){pend=videoId;return;}
-
-  player.loadVideoById(videoId);
-  if(!userMuted)player.unMute();
-  player.playVideo();
-
-  kickTimer=setTimeout(()=>{
-    const st=player.getPlayerState?.();
-    if(st!==1&&st!==3){
-      player.mute();
-      player.playVideo();
-    }
-  },1100);
-
-  verifyTimer=setTimeout(()=>{
-    const st=player.getPlayerState?.();
-    if(st===1||st===3)return;
-    badIds.add(videoId);
-    handleBlockedStream();
-  },2600);
-}
-
-async function handleBlockedStream(){
-  if(!cur)return;
-  const myToken=playToken;
-
-  while(altQueue.length){
-    const nextAlt=altQueue.shift();
-    if(!badIds.has(nextAlt)){
-      cur.streamId=nextAlt;
-      $('#state-badge').textContent='Switching audio source…';
-      loadVideo(nextAlt);
-      return;
-    }
-  }
-
-  if(!cur.searchedAlts){
-    cur.searchedAlts=true;
-    $('#state-badge').textContent='Finding embeddable audio…';
-    const alts=await gatherAltCandidates(cur);
-    if(myToken!==playToken)return;
-    if(alts.length){
-      altQueue=alts;
-      const firstAlt=altQueue.shift();
-      cur.streamId=firstAlt;
-      loadVideo(firstAlt);
-      return;
-    }
-  }
-
-  $('#st').textContent=`Label blocked embedding for "${cur.title}" — skipped to next track.`;
-  skip(true);
-}
-
-const row=t=>`<div class="row${cur&&cur.id===t.id?' active':''}" data-id="${t.id}"><img src="${esc(t.thumb)}" onerror="this.src='https://i.ytimg.com/vi/${t.id}/hqdefault.jpg'" alt=""><div><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><small>${t.duration?fmt(t.duration):''}</small></div>`;
-function draw(){
-  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
-  const L=tab=='res'?results:next;
-  $('#ls').innerHTML=L.length?L.map(row).join(''):'<p class="msg">'+(tab=='res'?'Search a song or artist to start.':'Up next queue fills automatically once a song plays.')+'</p>';
-}
-const meta=t=>{$('#mt').textContent=t.artist;$('#t1').textContent=fmt(t.duration||0)};
-
-function play(t,back){
-  playToken++;
-  clearTimers();
-  altQueue=[];
-
-  if(cur&&!back)hist.push(cur);
-  cur=t;
-  seen.add(t.id);
-  $('#st').textContent='';
   $('#deck').hidden=false;
-  setArt(t);
+  $('#art').src=t.thumb||'';
   $('#tt').textContent=t.title;
+  $('#mt').textContent=t.artist;
   $('#t0').textContent='0:00';
+  $('#t1').textContent=fmt(t.duration||0);
   $('#seek').value=0;
-  meta(t);
-  draw();
-  document.title=t.title+' · '+t.artist;
+  $('#st').textContent='';
+  renderList();
 
-  const startId=badIds.has(t.streamId)?t.id:t.streamId;
-  loadVideo(startId);
-  alignCover(t);
-
-  if('mediaSession' in navigator){
-    navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.artist,artwork:[{src:t.thumb}]});
+  if(t.engine==='audius'){
+    $('#yt-wrap').hidden=true;
+    $('#badge').textContent='Audius Stream';
+    aud.src=t.streamUrl;
+    aud.volume=+$('#vol').value/100;
+    aud.play().catch(()=>{ $('#badge').textContent='Press ▶ to play'; });
+  }else{
+    $('#yt-wrap').hidden=false;
+    $('#badge').textContent='YouTube Embed';
+    if(ytReady){
+      ytPlayer.loadVideoById(t.id);
+      ytPlayer.setVolume(+$('#vol').value);
+      ytPlayer.playVideo();
+    }else{
+      ytPending=t.id;
+    }
   }
-  related(t).then(r=>{
-    r.forEach(x=>lib[x.id]=x);
-    next=r.filter(x=>!seen.has(x.id)&&!badIds.has(x.id));
-    draw();
-  }).catch(()=>{});
 }
 
-const skip=bad=>{
-  clearTimers();
-  const L=bad===true?[...results,...next]:[...next,...results];
-  const n=L.find(x=>!seen.has(x.id)&&!badIds.has(x.id));
-  if(n)play(n);
-  else if(bad===true){
-    $('#state-badge').textContent='Unavailable';
-    $('#st').textContent='No embeddable tracks left in this list. Try another search.';
-  }
+/* ---- Native HTML5 <audio> Events ---- */
+aud.onplay=()=>{ $('#pp').textContent='⏸'; $('#badge').textContent='Now playing'; };
+aud.onpause=()=>{ $('#pp').textContent='▶'; if(!aud.ended)$('#badge').textContent='Paused'; };
+aud.onended=()=>{ if(idx+1<tracks.length)playAt(idx+1); };
+aud.onerror=()=>{ $('#st').textContent='This stream failed to load. Click another track.'; };
+aud.ontimeupdate=()=>{
+  if(activeEngine!=='audius'||drag||!aud.duration)return;
+  $('#seek').value=Math.round((aud.currentTime/aud.duration)*1000);
+  $('#t0').textContent=fmt(aud.currentTime);
+  $('#t1').textContent=fmt(aud.duration);
 };
 
+/* ---- Official YouTube IFrame API (Compliant visible 200x200 player) ---- */
 window.onYouTubeIframeAPIReady=()=>{
-  const pv={autoplay:1,playsinline:1,rel:0,enablejsapi:1,controls:0,disablekb:1,fs:0,iv_load_policy:3};
-  if(location.origin.startsWith('http')){pv.origin=location.origin;pv.widget_referrer=location.href;}
-  player=new YT.Player('yt',{width:'200',height:'200',playerVars:pv,events:{
+  const pv={autoplay:1,playsinline:1,rel:0,enablejsapi:1};
+  if(location.origin.startsWith('http'))pv.origin=location.origin;
+  ytPlayer=new YT.Player('yt',{width:'200',height:'200',playerVars:pv,events:{
     onReady(){
-      const ifr=player.getIframe?.();
+      const ifr=ytPlayer.getIframe?.();
       if(ifr)ifr.referrerPolicy='strict-origin-when-cross-origin';
-      ready=1;
-      if(pend)loadVideo(pend);
+      ytReady=1;
+      if(ytPending){ytPlayer.loadVideoById(ytPending);ytPending=null;}
     },
     onStateChange(e){
-      $('#pp').textContent=e.data==1?'⏸':'▶';
-      if(e.data==1){
-        clearTimers();
-        fails=0;
-        $('#st').textContent='';
-        $('#state-badge').textContent='Now playing';
-        if(!userMuted&&player.isMuted?.()){
-          player.unMute();
-          player.setVolume(+$('#vol').value);
-          setTimeout(()=>{
-            if(player.getPlayerState?.()!==1){
-              $('#state-badge').textContent='Tap ▶ to unmute';
-            }
-          },250);
-        }
-        const d=player.getDuration()|0;
-        if(cur&&d){cur.duration=d;meta(cur)}
-      }else if(e.data==2){
-        clearTimers();
-        if($('#state-badge').textContent!=='Tap ▶ to unmute'){
-          $('#state-badge').textContent='Paused';
-        }
-      }else if(e.data==3){
-        $('#state-badge').textContent='Buffering…';
-      }else if(e.data==0){
-        skip();
+      if(activeEngine!=='youtube')return;
+      $('#pp').textContent=e.data===1?'⏸':'▶';
+      if(e.data===1){
+        $('#badge').textContent='Now playing';
+        const d=ytPlayer.getDuration()|0;
+        if(d&&tracks[idx]){tracks[idx].duration=d;$('#t1').textContent=fmt(d);renderList();}
+      }else if(e.data===2){
+        $('#badge').textContent='Paused';
+      }else if(e.data===0&&idx+1<tracks.length){
+        playAt(idx+1);
       }
     },
     onError(e){
-      clearTimers();
-      if(cur)badIds.add(cur.streamId);
-      fails++;
-      if(fails>=10){
-        $('#state-badge').textContent='Blocked';
-        $('#st').textContent=`YouTube blocked playback (Error ${e.data}). Serve over http://localhost or HTTPS and disable extensions that block Referer headers.`;
-        return;
-      }
-      handleBlockedStream();
+      // Single clean notice—no infinite search or skip loop
+      $('#badge').textContent='Embed disabled';
+      $('#st').textContent=`Uploader disabled embedding on this video (Error ${e.data}). Pick another result below.`;
     }
   }});
 };
-const ys=document.createElement('script');ys.src='https://www.youtube.com/iframe_api';document.head.append(ys);
+const ys=document.createElement('script');
+ys.src='https://www.youtube.com/iframe_api';
+document.head.append(ys);
 
-/* ---- scrubber, play/pause, volume synced to hidden player ---- */
 setInterval(()=>{
-  if(!ready||drag||player.getPlayerState?.()!==1)return;
-  const c=player.getCurrentTime()||0,d=player.getDuration()||0;
+  if(activeEngine!=='youtube'||!ytReady||drag||ytPlayer.getPlayerState?.()!==1)return;
+  const c=ytPlayer.getCurrentTime()||0,d=ytPlayer.getDuration()||0;
   if(d>0){$('#seek').value=Math.round((c/d)*1000);$('#t0').textContent=fmt(c);$('#t1').textContent=fmt(d);}
 },300);
-$('#seek').oninput=()=>{drag=1;const d=ready?(player.getDuration()||0):0;$('#t0').textContent=fmt(($('#seek').value/1000)*d)};
-$('#seek').onchange=()=>{if(ready){const d=player.getDuration()||0;player.seekTo(($('#seek').value/1000)*d,true)}drag=0};
-$('#vol').oninput=()=>{if(!ready)return;userMuted=+$('#vol').value===0;if(userMuted)player.mute();else{player.unMute();player.setVolume(+$('#vol').value)}$('#mut').textContent=userMuted?'🔇':'🔊'};
-$('#mut').onclick=()=>{if(!ready)return;if(player.isMuted()){userMuted=false;player.unMute();player.setVolume(+$('#vol').value||100);$('#mut').textContent='🔊'}else{userMuted=true;player.mute();$('#mut').textContent='🔇'}};
 
-$('#f').onsubmit=async e=>{
-  e.preventDefault();const q=$('#q').value.trim();if(!q)return;
-  fails=0;seen.clear();ytmCovers=[];$('#st').textContent='Searching…';
-  try{
-    results=await search(q);results.forEach(x=>lib[x.id]=x);
-    tab='res';draw();$('#st').textContent='';
-    if(results[0])play(results[0]);
-  }catch(x){$('#st').textContent=x.message||'Search failed. Please try again.'}
+/* ---- Transport, Scrubber & Volume ---- */
+$('#seek').oninput=()=>{
+  drag=1;
+  const d=activeEngine==='audius'?(aud.duration||0):(ytReady?ytPlayer.getDuration()||0:0);
+  $('#t0').textContent=fmt(($('#seek').value/1000)*d);
 };
-$('#ls').onclick=e=>{const r=e.target.closest('.row');if(r){fails=0;play(lib[r.dataset.id])}};
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;draw()});
+$('#seek').onchange=()=>{
+  const pct=$('#seek').value/1000;
+  if(activeEngine==='audius'&&aud.duration)aud.currentTime=pct*aud.duration;
+  else if(activeEngine==='youtube'&&ytReady)ytPlayer.seekTo(pct*(ytPlayer.getDuration()||0),true);
+  drag=0;
+};
 $('#pp').onclick=()=>{
-  if(!ready)return;
-  if(player.getPlayerState()==1){
-    player.pauseVideo();
-  }else{
-    if(!userMuted){
-      player.unMute();
-      player.setVolume(+$('#vol').value||100);
-    }
-    player.playVideo();
+  if(activeEngine==='audius'){
+    aud.paused?aud.play():aud.pause();
+  }else if(ytReady){
+    ytPlayer.getPlayerState()===1?ytPlayer.pauseVideo():ytPlayer.playVideo();
   }
 };
-$('#nt').onclick=()=>{fails=0;skip()};
-$('#pv').onclick=()=>{if(!ready)return;if(player.getCurrentTime()>3||!hist.length)player.seekTo(0);else play(hist.pop(),true)};
+$('#pv').onclick=()=>{
+  if(activeEngine==='audius'&&aud.currentTime>3){aud.currentTime=0;return;}
+  if(activeEngine==='youtube'&&ytReady&&ytPlayer.getCurrentTime()>3){ytPlayer.seekTo(0);return;}
+  if(idx>0)playAt(idx-1);
+};
+$('#nt').onclick=()=>{ if(idx+1<tracks.length)playAt(idx+1); };
+$('#vol').oninput=()=>{
+  const v=+$('#vol').value;
+  aud.volume=v/100;aud.muted=v===0;
+  if(ytReady){ytPlayer.unMute();ytPlayer.setVolume(v);}
+  $('#mut').textContent=v===0?'🔇':'🔊';
+};
+$('#mut').onclick=()=>{
+  if(activeEngine==='audius'){
+    aud.muted=!aud.muted;
+    $('#mut').textContent=aud.muted?'🔇':'🔊';
+  }else if(ytReady){
+    if(ytPlayer.isMuted()){ytPlayer.unMute();$('#mut').textContent='🔊';}
+    else{ytPlayer.mute();$('#mut').textContent='🔇';}
+  }
+};
+
+/* ---- Search & Settings ---- */
+$('#f').onsubmit=async e=>{
+  e.preventDefault();
+  const q=$('#q').value.trim();
+  if(!q)return;
+  $('#st').textContent=ytKey?'Searching YouTube…':'Searching Audius…';
+  try{
+    tracks=ytKey?await searchYouTube(q):await searchAudius(q);
+    idx=-1;
+    renderList();
+    $('#st').textContent=tracks.length?'':'No tracks found.';
+    if(tracks[0])playAt(0);
+  }catch(err){
+    $('#st').textContent=err.message;
+  }
+};
+$('#ls').onclick=e=>{
+  const r=e.target.closest('.row');
+  if(r)playAt(+r.dataset.i);
+};
 $('#gear').onclick=()=>$('#set').hidden=!$('#set').hidden;
-$('#ks').onclick=e=>{e.preventDefault();key=$('#key').value.trim()||BUILT_IN_KEY;LS.set('key',$('#key').value.trim());$('#set').hidden=true;$('#st').textContent=key?'Using your YouTube API key.':'Using keyless search.'};
-if('mediaSession' in navigator){
-  navigator.mediaSession.setActionHandler('nexttrack',()=>{fails=0;skip()});
-  navigator.mediaSession.setActionHandler('play',()=>player.playVideo());
-  navigator.mediaSession.setActionHandler('pause',()=>player.pauseVideo());
-}
-if(location.protocol=='file:')$('#st').textContent='Serve this page over http://localhost or HTTPS so YouTube allows embeds.';
-else if(window.top!==window.self)$('#st').textContent='Note: running inside a sandboxed preview frame may cause YouTube to block embeds (Error 152-4). Open directly in a browser tab.';
-draw();
+$('#ks').onclick=()=>{
+  ytKey=$('#key').value.trim();
+  ytChan=$('#chan').value;
+  LS.set('yt_key',ytKey);
+  LS.set('yt_chan',ytChan);
+  $('#set').hidden=true;
+  $('#st').textContent=ytKey?'Using YouTube Data API v3.':'Using keyless Audius audio streams.';
+};
+
+renderList();
 </script>
 </body>
 </html>
