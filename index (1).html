@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Embed Player</title>
+<style>
+:root{--bg:#1c1830;--sf:#272142;--ln:#3a3260;--tx:#f3effa;--mu:#a79fc4;--ac:#ffb347}
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:16px}
+button{font:inherit;cursor:pointer;border:0}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+#f{display:flex;gap:8px;max-width:1000px;margin:0 auto 12px}
+#q,#key{flex:1;min-width:0;background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:10px 12px;color:var(--tx);font:inherit}
+#f button,#ks{background:var(--ac);color:#201400;border-radius:8px;padding:10px 16px;font-weight:600}
+#f .ghost{background:none;color:var(--mu);border:1px solid var(--ln);padding:10px 12px}
+#set{max-width:1000px;margin:0 auto 12px;padding:12px;background:var(--sf);border-radius:10px;display:flex;flex-wrap:wrap;gap:8px}
+#set small{flex-basis:100%;color:var(--mu)}
+.grid{display:grid;grid-template-columns:1fr 340px;gap:24px;max-width:1000px;margin:auto;align-items:start}
+@media(max-width:760px){.grid{grid-template-columns:1fr}aside{order:-1}}
+aside{position:sticky;top:16px}
+#vid{aspect-ratio:16/9;min-width:200px;background:#000;border-radius:12px;overflow:hidden}
+#vid iframe{width:100%;height:100%;border:0}
+.ctl{display:flex;justify-content:center;gap:10px;margin-top:10px}
+.ctl button{width:46px;height:46px;border-radius:50%;font-size:20px;background:var(--sf);color:var(--tx)}
+#pp{background:var(--ac)!important;color:#201400!important}
+#hero{display:flex;gap:16px;align-items:center;margin-bottom:12px}
+#art{width:120px;height:120px;object-fit:cover;border-radius:12px;background:var(--sf);flex:none}
+#hero small{color:var(--mu)}
+#tt{font:700 30px/1.15 Georgia,serif;overflow-wrap:anywhere}
+#mt{color:var(--mu)}
+#st{color:var(--mu);min-height:1.4em}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--ln);margin:8px 0}
+nav button{background:none;padding:8px 14px;color:var(--mu);border-bottom:2px solid transparent}
+nav button.on{color:var(--tx);border-color:var(--ac)}
+.row{display:flex;gap:12px;align-items:center;padding:6px;border-radius:8px;cursor:pointer}
+.row:hover{background:var(--sf)}
+.row img{width:64px;height:48px;object-fit:cover;border-radius:6px;flex:none}
+.row div{min-width:0}
+.row b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row small{color:var(--mu)}
+.msg{color:var(--mu);padding:12px 6px}
+</style>
+</head>
+<body>
+<form id="f">
+  <input id="q" placeholder="Search a song or artist" autocomplete="off" autofocus>
+  <button>Search</button>
+  <button type="button" id="gear" class="ghost" title="Settings" aria-label="Settings">⚙</button>
+</form>
+<div id="set" hidden>
+  <input id="key" type="password" placeholder="YouTube Data API key (optional)" autocomplete="off">
+  <button id="ks">Save</button>
+  <small>Without a key, search uses public Piped servers, which can be slow or down. A free YouTube Data API key makes search steadier. It is stored in this browser only.</small>
+</div>
+<div class="grid">
+  <section>
+    <div id="hero" hidden><img id="art" alt=""><div><small>Now playing</small><h1 id="tt"></h1><p id="mt"></p></div></div>
+    <div id="st"></div>
+    <nav><button data-t="res" class="on">Results</button><button data-t="nx">Up next</button></nav>
+    <div id="ls"></div>
+  </section>
+  <aside>
+    <div id="vid"><div id="yt"></div></div>
+    <div class="ctl">
+      <button id="pv" aria-label="Previous">⏮</button>
+      <button id="pp" aria-label="Play or pause">▶</button>
+      <button id="nt" aria-label="Next">⏭</button>
+    </div>
+  </aside>
+</div>
+<script>
+const BUILT_IN_KEY=''; // optional: your own YouTube Data API key, restricted to this site's domain in Google Cloud
+const PIPED=['https://pipedapi.kavin.rocks','https://pipedapi.leptons.xyz','https://pipedapi.nosebs.ru','https://pipedapi.adminforge.de','https://api.piped.private.coffee','https://pipedapi.orangenet.cc'];
+
+const $=s=>document.querySelector(s);
+const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
+let key=LS.get('key','')||BUILT_IN_KEY,pi=0,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=s=>s?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'';
+const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.value};
+
+/* ---- turn YouTube titles into song + artist ---- */
+const JUNK=/\s*[\(\[][^\)\]]*(official|audio|lyric|video|visuali[sz]er|remaster)[^\)\]]*[\)\]]/ig;
+function tidy(title,up){
+  let a=(up||'').replace(/\s*-\s*Topic$|VEVO$/i,'').trim(),t=(title||'').replace(JUNK,'').trim();
+  const k=t.indexOf(' - ');
+  if(k>0){a=t.slice(0,k).trim();t=t.slice(k+3).trim()}
+  return{title:t,artist:a};
+}
+const vidOf=u=>(u.match(/[?&]v=([\w-]{11})/)||[])[1];
+const mk=(id,title,up,dur)=>({id,...tidy(title,up),duration:dur||null,thumb:`https://i.ytimg.com/vi/${id}/mqdefault.jpg`});
+const fromPiped=i=>mk(vidOf(i.url),i.title,i.uploaderName,i.duration);
+
+/* ---- search: keyless via public Piped servers, or the YouTube Data API if a key is set ---- */
+async function piped(path){
+  for(let n=0;n<PIPED.length;n++){
+    const idx=(pi+n)%PIPED.length,c=new AbortController(),tm=setTimeout(()=>c.abort(),7000);
+    try{
+      const r=await fetch(PIPED[idx]+path,{signal:c.signal});
+      if(!r.ok)throw 0;
+      const d=await r.json();pi=idx;return d;
+    }catch{}finally{clearTimeout(tm)}
+  }
+  throw Error('No keyless search server answered. Add a free YouTube API key in settings (⚙).');
+}
+async function search(q){
+  if(key){
+    const u=new URL('https://www.googleapis.com/youtube/v3/search');
+    u.search=new URLSearchParams({part:'snippet',q,type:'video',videoCategoryId:10,videoEmbeddable:true,maxResults:15,key});
+    const r=await fetch(u),d=await r.json();
+    if(!r.ok)throw Error(d.error?.message||'YouTube API error '+r.status);
+    return d.items.map(i=>mk(i.id.videoId,dec(i.snippet.title),dec(i.snippet.channelTitle)));
+  }
+  const e=encodeURIComponent(q),ok=d=>(d.items||[]).filter(i=>vidOf(i.url||''));
+  let it=ok(await piped('/search?q='+e+'&filter=music_songs'));
+  if(!it.length)it=ok(await piped('/search?q='+e+'&filter=videos'));
+  return it.map(fromPiped);
+}
+async function related(t){ // YouTube's own related videos via Piped, else more from the same artist
+  if(!key){
+    try{
+      const d=await piped('/streams/'+t.id);
+      return d.relatedStreams.filter(i=>vidOf(i.url||'')&&i.duration>0&&i.duration<=720).map(fromPiped);
+    }catch{}
+  }
+  return search(t.artist+' songs');
+}
+
+/* ---- UI ---- */
+const row=t=>`<div class="row" data-id="${t.id}"><img src="${t.thumb}" alt=""><div><b>${esc(t.title)}</b><small>${esc(t.artist)}${t.duration?' · '+fmt(t.duration):''}</small></div></div>`;
+function draw(){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
+  const L=tab=='res'?results:next;
+  $('#ls').innerHTML=L.length?L.map(row).join(''):'<p class="msg">'+(tab=='res'?'Search above to start.':'Suggestions appear once a song is playing.')+'</p>';
+}
+const meta=t=>{$('#mt').textContent=[t.artist,fmt(t.duration)].filter(Boolean).join(' · ')};
+function play(t,back){
+  if(cur&&!back)hist.push(cur);
+  cur=t;seen.add(t.id);
+  $('#hero').hidden=false;$('#art').src=t.thumb;$('#tt').textContent=t.title;meta(t);document.title=t.title;
+  if(ready)player.loadVideoById(t.id);else pend=t;
+  if('mediaSession' in navigator)navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.artist,artwork:[{src:t.thumb}]});
+  related(t).then(r=>{r.forEach(x=>lib[x.id]=x);next=r.filter(x=>!seen.has(x.id));draw()}).catch(()=>{});
+}
+const skip=()=>{const n=next.find(x=>!seen.has(x.id));if(n)play(n)};
+
+window.onYouTubeIframeAPIReady=()=>{
+  player=new YT.Player('yt',{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0},events:{
+    onReady(){ready=1;if(pend)player.loadVideoById(pend.id)},
+    onStateChange(e){
+      $('#pp').textContent=e.data==1?'⏸':'▶';
+      if(e.data==1&&cur&&!cur.duration){cur.duration=player.getDuration()|0;meta(cur)}
+      if(e.data==0)skip();
+    },
+    onError(){skip()}
+  }});
+};
+const ys=document.createElement('script');ys.src='https://www.youtube.com/iframe_api';document.head.append(ys);
+
+$('#f').onsubmit=async e=>{
+  e.preventDefault();const q=$('#q').value.trim();if(!q)return;
+  $('#st').textContent='Searching…';
+  try{
+    results=await search(q);results.forEach(x=>lib[x.id]=x);
+    tab='res';draw();$('#st').textContent=results.length?'':'No results.';
+    if(results[0])play(results[0]);
+  }catch(x){$('#st').textContent=x.message}
+};
+$('#ls').onclick=e=>{const r=e.target.closest('.row');if(r)play(lib[r.dataset.id])};
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;draw()});
+$('#pp').onclick=()=>ready&&(player.getPlayerState()==1?player.pauseVideo():player.playVideo());
+$('#nt').onclick=skip;
+$('#pv').onclick=()=>{if(!ready)return;if(player.getCurrentTime()>3||!hist.length)player.seekTo(0);else play(hist.pop(),true)};
+$('#gear').onclick=()=>$('#set').hidden=!$('#set').hidden;
+$('#ks').onclick=e=>{e.preventDefault();key=$('#key').value.trim()||BUILT_IN_KEY;LS.set('key',$('#key').value.trim());$('#set').hidden=true;$('#st').textContent=key?'Using your YouTube API key for search.':'Using keyless search.'};
+if('mediaSession' in navigator){
+  navigator.mediaSession.setActionHandler('nexttrack',skip);
+  navigator.mediaSession.setActionHandler('play',()=>player.playVideo());
+  navigator.mediaSession.setActionHandler('pause',()=>player.pauseVideo());
+}
+if(location.protocol=='file:')$('#st').textContent='YouTube blocks embeds on file:// pages. Upload this to your host (or serve it locally) to play.';
+draw();
+</script>
+</body>
+</html>
