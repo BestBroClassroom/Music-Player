@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Multi-Source Audio Player</title>
+<style>
+:root{
+  --bg:#1c1830;
+  --sf:#272142;
+  --sf2:#312952;
+  --ln:#3a3260;
+  --tx:#f3effa;
+  --mu:#a79fc4;
+  --ac:#ffb347;
+  --ac-tx:#201400;
+}
+*{box-sizing:border-box;margin:0}
+body{
+  font:15px/1.45 system-ui,-apple-system,sans-serif;
+  background:var(--bg);
+  color:var(--tx);
+  padding:20px 16px 44px;
+}
+button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.app{max-width:800px;margin:auto}
+
+/* Search & Settings Bar */
+#f{display:flex;gap:8px;margin-bottom:12px}
+#q,#sc-cid,#ac-tok{
+  flex:1;min-width:0;
+  background:var(--sf);
+  border:1px solid var(--ln);
+  border-radius:10px;
+  padding:11px 14px;
+  color:var(--tx);
+  font:inherit;
+}
+#q::placeholder,#sc-cid::placeholder,#ac-tok::placeholder{color:var(--mu)}
+#f button[type="submit"],#save-set{
+  background:var(--ac);
+  color:var(--ac-tx);
+  border-radius:10px;
+  padding:11px 18px;
+  font-weight:600;
+}
+#gear{
+  background:var(--sf);
+  border:1px solid var(--ln);
+  border-radius:10px;
+  padding:0 13px;
+  color:var(--mu);
+}
+#gear:hover{color:var(--tx)}
+#set{
+  background:var(--sf);
+  border:1px solid var(--ln);
+  border-radius:12px;
+  padding:14px;
+  margin-bottom:14px;
+  display:grid;
+  gap:10px;
+}
+#set[hidden]{display:none}
+.set-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+@media(max-width:640px){.set-grid{grid-template-columns:1fr}}
+#set small{color:var(--mu);font-size:12.5px;line-height:1.4}
+
+/* Source Switcher */
+.sources{
+  display:flex;gap:8px;flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.src-btn{
+  padding:7px 14px;
+  border-radius:999px;
+  background:var(--sf);
+  border:1px solid var(--ln);
+  color:var(--mu);
+  font-size:13px;
+  font-weight:600;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.src-btn:hover{color:var(--tx)}
+.src-btn.on{
+  background:var(--ac);
+  color:var(--ac-tx);
+  border-color:var(--ac);
+}
+.src-tag{
+  font-size:10px;
+  padding:1px 6px;
+  border-radius:999px;
+  background:rgba(0,0,0,.22);
+}
+
+/* Now Playing Deck */
+#deck{
+  background:var(--sf);
+  border:1px solid var(--ln);
+  border-radius:16px;
+  padding:18px;
+  margin-bottom:14px;
+  display:flex;
+  gap:20px;
+  align-items:center;
+}
+#deck[hidden]{display:none}
+@media(max-width:620px){
+  #deck{flex-direction:column;text-align:center}
+}
+#art{
+  width:176px;height:176px;flex:none;
+  border-radius:12px;
+  object-fit:cover;
+  background:#141024;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.info{flex:1;min-width:0;width:100%}
+.topline{display:flex;align-items:center;justify-content:space-between;gap:8px}
+@media(max-width:620px){.topline{justify-content:center}}
+.badge{
+  color:var(--ac);
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  font-size:11px;
+}
+.pill-meta{
+  font-size:11px;
+  color:var(--mu);
+  background:var(--bg);
+  padding:2px 9px;
+  border-radius:999px;
+}
+#tt{
+  font:700 23px/1.2 Georgia,serif;
+  overflow-wrap:anywhere;
+  margin:5px 0 3px;
+}
+#mt{color:var(--mu);font-size:14px}
+
+/* Scrubber & Transport (for Audius + SoundCloud) */
+#native-ctl[hidden]{display:none}
+.scrub{
+  display:flex;align-items:center;gap:10px;
+  margin-top:15px;
+  font-size:12px;color:var(--mu);
+  font-variant-numeric:tabular-nums;
+}
+.bar-wrap{
+  position:relative;flex:1;height:18px;
+  display:flex;align-items:center;
+}
+.bar-bg,.bar-buf,.bar-fill{
+  position:absolute;left:0;height:5px;border-radius:999px;pointer-events:none;
+}
+.bar-bg{width:100%;background:var(--bg)}
+.bar-buf{width:0%;background:var(--ln)}
+.bar-fill{width:0%;background:var(--ac)}
+#seek{
+  position:relative;width:100%;margin:0;
+  background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer;
+}
+#seek::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--ac);border:2px solid var(--tx);
+}
+#seek::-moz-range-thumb{
+  width:14px;height:14px;border-radius:50%;
+  background:var(--ac);border:2px solid var(--tx);
+}
+.ctl{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-top:13px;
+}
+@media(max-width:620px){.ctl{justify-content:center;flex-wrap:wrap}}
+.btns{display:flex;align-items:center;gap:8px}
+.btns button,#mut{
+  width:38px;height:38px;border-radius:50%;
+  font-size:15px;background:var(--bg);color:var(--tx);
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:background .15s,color .15s;
+}
+.btns button:hover,#mut:hover{background:var(--sf2)}
+.btns button.on{color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac)}
+#pp{
+  width:48px;height:48px;font-size:18px;
+  background:var(--ac)!important;color:var(--ac-tx)!important;
+}
+.volbox{display:flex;align-items:center;gap:6px}
+#vol{width:84px;accent-color:var(--ac);cursor:pointer}
+
+/* audio.com Embedded Player Container */
+#ac-embed-wrap{margin-top:14px;border-radius:12px;overflow:hidden;background:#141024}
+#ac-embed-wrap[hidden]{display:none}
+#ac-frame{width:100%;height:152px;border:0;display:block}
+
+/* Offscreen SoundCloud Widget Iframe (controlled via SC.Widget JS API) */
+#sc-hidden{position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px}
+
+/* Status, Sub-tabs, Genre Pills & Track List */
+#st{color:var(--mu);font-size:13px;min-height:1.3em;margin-bottom:8px}
+.toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;flex-wrap:wrap;
+  border-bottom:1px solid var(--ln);
+  margin-bottom:10px;padding-bottom:6px;
+}
+nav{display:flex;gap:4px}
+nav button{
+  padding:6px 12px;color:var(--mu);
+  border-bottom:2px solid transparent;font-weight:600;
+}
+nav button.on{color:var(--tx);border-color:var(--ac)}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.pills[hidden]{display:none}
+.pill{
+  font-size:12px;padding:5px 11px;border-radius:999px;
+  background:var(--sf);color:var(--mu);border:1px solid var(--ln);
+}
+.pill:hover{color:var(--tx)}
+.pill.on{background:var(--ac);color:var(--ac-tx);border-color:var(--ac);font-weight:600}
+
+.row{
+  display:flex;gap:12px;align-items:center;
+  padding:8px 10px;border-radius:10px;cursor:pointer;
+  transition:background .12s;
+}
+.row:hover,.row.active{background:var(--sf)}
+.row.active b{color:var(--ac)}
+.row img{
+  width:48px;height:48px;object-fit:cover;
+  border-radius:8px;flex:none;background:#141024;
+}
+.row .meta{min-width:0;flex:1}
+.row b{
+  display:block;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.row small{color:var(--mu);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .dur{color:var(--mu);font-size:13px;font-variant-numeric:tabular-nums;flex:none}
+.verified{color:var(--ac);font-size:12px;margin-left:3px}
+.msg{color:var(--mu);padding:22px 6px;text-align:center}
+</style>
+</head>
+<body>
+<div class="app">
+  <form id="f">
+    <input id="q" placeholder="Search songs, artists, or paste a SoundCloud / audio.com link…" autocomplete="off" autofocus>
+    <button type="submit">Search</button>
+    <button type="button" id="gear" title="API Settings" aria-label="API Settings">⚙</button>
+  </form>
+
+  <div id="set" hidden>
+    <div class="set-grid">
+      <input id="ac-tok" type="password" placeholder="Optional: audio.com Bearer token" autocomplete="off">
+      <input id="sc-cid" type="text" placeholder="Optional: SoundCloud client_id override" autocomplete="off">
+      <button type="button" id="save-set">Save</button>
+    </div>
+    <small>
+      All three sources work with <b>no keys required</b>. You can optionally add an <b>audio.com</b> OAuth token (from <code>audio.com/public-api</code>) or a custom SoundCloud <code>client_id</code>.
+    </small>
+  </div>
+
+  <div class="sources" role="tablist" aria-label="Streaming Source">
+    <button type="button" class="src-btn on" data-src="audius">Audius <span class="src-tag">Native Audio</span></button>
+    <button type="button" class="src-btn" data-src="soundcloud">SoundCloud <span class="src-tag">Full Tracks Only</span></button>
+    <button type="button" class="src-btn" data-src="audiocom">audio.com <span class="src-tag">Public Search</span></button>
+  </div>
+
+  <div id="deck" hidden>
+    <img id="art" alt="Cover art">
+    <div class="info">
+      <div class="topline">
+        <span class="badge" id="badge">Now playing</span>
+        <span class="pill-meta" id="src-pill">Audius</span>
+      </div>
+      <h1 id="tt"></h1>
+      <p id="mt"></p>
+
+      <div id="native-ctl">
+        <div class="scrub">
+          <span id="t0">0:00</span>
+          <div class="bar-wrap">
+            <div class="bar-bg"></div>
+            <div class="bar-buf" id="buf"></div>
+            <div class="bar-fill" id="fill"></div>
+            <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+          </div>
+          <span id="t1">0:00</span>
+        </div>
+
+        <div class="ctl">
+          <div class="btns">
+            <button id="shuf" title="Shuffle" aria-label="Toggle shuffle">🔀</button>
+            <button id="pv" title="Previous" aria-label="Previous">⏮</button>
+            <button id="pp" title="Play or pause" aria-label="Play or pause">▶</button>
+            <button id="nt" title="Next" aria-label="Next">⏭</button>
+            <button id="rep" title="Repeat: Off" aria-label="Cycle repeat mode">🔁</button>
+          </div>
+          <div class="volbox">
+            <button id="mut" title="Mute" aria-label="Mute or unmute">🔊</button>
+            <input id="vol" type="range" min="0" max="100" value="100" aria-label="Volume">
+          </div>
+        </div>
+      </div>
+
+      <div id="ac-embed-wrap" hidden>
+        <iframe id="ac-frame" allow="autoplay"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <div id="st"></div>
+
+  <div class="toolbar" id="audius-bar">
+    <nav>
+      <button type="button" data-tab="trend" class="on">Trending</button>
+      <button type="button" data-tab="search">Results</button>
+    </nav>
+  </div>
+
+  <div class="pills" id="genres"></div>
+  <div id="ls"></div>
+</div>
+
+<audio id="aud" preload="auto"></audio>
+<div id="sc-hidden">
+  <iframe id="sc-frame" allow="autoplay" src="https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/293&auto_play=false"></iframe>
+</div>
+
+<script src="https://w.soundcloud.com/player/api.js"></script>
+<script>
+const APP_NAME='MultiSourceAudioPlayer';
+const GENRES=['All','Electronic','Hip-Hop/Rap','Pop','Rock','Lo-Fi','R&B/Soul','House'];
+const PROXIES=[
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
+];
+
+const $=s=>document.querySelector(s);
+const LS={
+  get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},
+  set(k,v){try{localStorage.setItem(k,v)}catch{}}
+};
+
+/* ---- State ---- */
+let source='audius'; // 'audius' | 'soundcloud' | 'audiocom'
+let audiusHosts=['https://api.audius.co'];
+let audiusHostIdx=0;
+let audiusTab='trend';
+let activeGenre='All';
+let trendTracks=[];
+let audiusSearchTracks=[];
+let scTracks=[];
+let acTracks=[];
+
+let queue=[];
+let idx=-1;
+let activeEngine=null; // 'audius' | 'soundcloud' | 'audiocom'
+let drag=false;
+let shuffle=false;
+let repeat=0; // 0 = off, 1 = all, 2 = one
+let streamRetries=0;
+
+let scClientId=LS.get('sc_cid','');
+let acToken=LS.get('ac_tok','');
+$('#sc-cid').value=scClientId;
+$('#ac-tok').value=acToken;
+
+let scWidget=null;
+let scReady=false;
+let scDurationSec=0;
+let scPaused=true;
+
+const aud=$('#aud');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=s=>Number.isFinite(s)&&s>=0?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'0:00';
+const fmtPlays=n=>!n?'':n>=1e6?(n/1e6).toFixed(1)+'M plays':n>=1e3?(n/1e3).toFixed(1)+'K plays':n+' plays';
+
+/* ---- Fallback SVG Artwork ---- */
+function fallbackArt(title,artist){
+  const label=(title||'?').trim().slice(0,2).toUpperCase();
+  let hash=0;
+  for(const ch of (title+artist))hash=(hash*31+ch.charCodeAt(0))|0;
+  const hue=Math.abs(hash)%360;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="hsl(${hue},55%,28%)"/>
+      <stop offset="100%" stop-color="hsl(${(hue+45)%360},60%,16%)"/>
+    </linearGradient></defs>
+    <rect width="480" height="480" fill="url(#g)"/>
+    <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle"
+      fill="#f3effa" font-family="Georgia,serif" font-size="140" font-weight="700">${esc(label)}</text>
+  </svg>`;
+  return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+}
+
+/* ---- Fetch helper with CORS proxy fallback ---- */
+async function fetchViaProxy(targetUrl,asJson=false){
+  const ctrl=new AbortController();
+  const tm=setTimeout(()=>ctrl.abort(),10000);
+  try{
+    return await Promise.any(PROXIES.map(async makeUrl=>{
+      const r=await fetch(makeUrl(targetUrl),{signal:ctrl.signal});
+      if(!r.ok)throw Error('HTTP '+r.status);
+      return asJson?await r.json():await r.text();
+    }));
+  }finally{
+    clearTimeout(tm);
+  }
+}
+
+/* =========================================================================
+   1. AUDIUS ENGINE (Native <audio>)
+   ========================================================================= */
+(async function discoverAudiusHosts(){
+  try{
+    const r=await fetch('https://api.audius.co',{signal:AbortSignal.timeout(5000)});
+    if(!r.ok)return;
+    const d=await r.json();
+    if(Array.isArray(d.data)&&d.data.length){
+      audiusHosts=[...new Set(['https://api.audius.co',...d.data])];
+    }
+  }catch{}
+})();
+
+async function audiusGet(path){
+  let lastErr;
+  for(let attempt=0;attempt<Math.min(audiusHosts.length,4);attempt++){
+    const base=audiusHosts[(audiusHostIdx+attempt)%audiusHosts.length];
+    const sep=path.includes('?')?'&':'?';
+    try{
+      const r=await fetch(`${base}${path}${sep}app_name=${APP_NAME}`,{signal:AbortSignal.timeout(8000)});
+      if(!r.ok)throw Error(`HTTP ${r.status}`);
+      const json=await r.json();
+      audiusHostIdx=(audiusHostIdx+attempt)%audiusHosts.length;
+      return json.data||[];
+    }catch(err){
+      lastErr=err;
+    }
+  }
+  throw lastErr||Error('Could not reach Audius.');
+}
+
+function mapAudiusTrack(t){
+  const title=t.title||'Untitled';
+  const artist=t.user?.name||'Unknown Artist';
+  const fb=fallbackArt(title,artist);
+  return{
+    engine:'audius',
+    id:t.id,
+    title,
+    artist,
+    verified:Boolean(t.user?.is_verified),
+    meta:t.genre||'',
+    plays:t.play_count||0,
+    duration:t.duration||0,
+    thumbSm:t.artwork?.['150x150']||t.artwork?.['480x480']||fb,
+    thumbLg:t.artwork?.['480x480']||t.artwork?.['1000x1000']||t.artwork?.['150x150']||fb,
+    fallback:fb
+  };
+}
+
+const isAudiusPlayable=t=>t&&t.id&&t.is_streamable!==false&&!t.is_stream_gated;
+const audiusStreamUrl=(id,h=audiusHostIdx)=>`${audiusHosts[h%audiusHosts.length]}/v1/tracks/${encodeURIComponent(id)}/stream?app_name=${APP_NAME}`;
+
+async function loadAudiusTrending(genre='All'){
+  activeGenre=genre;
+  renderSubControls();
+  $('#st').textContent=genre==='All'?'Loading Audius trending tracks…':`Loading Audius ${genre}…`;
+  try{
+    const q=genre==='All'?'/v1/tracks/trending?limit=25':`/v1/tracks/trending?genre=${encodeURIComponent(genre)}&limit=25`;
+    const raw=await audiusGet(q);
+    trendTracks=raw.filter(isAudiusPlayable).map(mapAudiusTrack);
+    if(source==='audius'&&audiusTab==='trend')renderList();
+    $('#st').textContent=trendTracks.length?'':'No trending tracks found.';
+  }catch(err){
+    $('#st').textContent='Audius error: '+err.message;
+  }
+}
+
+async function searchAudius(q){
+  audiusTab='search';
+  renderSubControls();
+  $('#st').textContent='Searching Audius…';
+  const raw=await audiusGet(`/v1/tracks/search?query=${encodeURIComponent(q)}&limit=25`);
+  audiusSearchTracks=raw.filter(isAudiusPlayable).map(mapAudiusTrack);
+  renderList();
+  $('#st').textContent=audiusSearchTracks.length?'':`No Audius tracks found for "${q}".`;
+  if(audiusSearchTracks.length)playTrack(0);
+}
+
+/* =========================================================================
+   2. SOUNDCLOUD ENGINE (Full Tracks Only — Excludes 30s Previews)
+   ========================================================================= */
+function isSoundCloudFullTrack(t){
+  if(!t||!t.permalink_url)return false;
+  // Exclude 30-second Go+ snippets / previews
+  if(t.policy==='SNIP'||t.snipped===true)return false;
+  if(t.embeddable_by==='none')return false;
+  const dur=Number(t.duration||0);
+  const full=Number(t.full_duration||dur);
+  // 30-second previews have duration ~30000ms while full_duration is the real track length
+  if(full>0&&dur>0&&(full-dur)>5000)return false;
+  if(dur===30000&&full>35000)return false;
+  return true;
+}
+
+function mapSoundCloudTrack(t){
+  const title=t.title||'Untitled';
+  const artist=t.user?.username||t.user?.full_name||'SoundCloud Artist';
+  const fb=fallbackArt(title,artist);
+  const rawArt=t.artwork_url||t.user?.avatar_url||'';
+  const thumbSm=rawArt?rawArt.replace('-large.','-t200x200.'):fb;
+  const thumbLg=rawArt?rawArt.replace('-large.','-t500x500.'):fb;
+  return{
+    engine:'soundcloud',
+    id:String(t.id),
+    permalinkUrl:t.permalink_url,
+    title,
+    artist,
+    verified:Boolean(t.user?.verified),
+    meta:t.genre||'Full Track',
+    plays:t.playback_count||0,
+    duration:Math.round((t.full_duration||t.duration||0)/1000),
+    thumbSm,
+    thumbLg,
+    fallback:fb
+  };
+}
+
+function extractBalancedArray(text,marker){
+  const idx=text.indexOf(marker);
+  if(idx<0)return null;
+  const start=text.indexOf('[',idx);
+  if(start<0)return null;
+  let depth=0,inStr=false,escNext=false;
+  for(let i=start;i<text.length;i++){
+    const ch=text[i];
+    if(inStr){
+      if(escNext)escNext=false;
+      else if(ch==='\\')escNext=true;
+      else if(ch==='"')inStr=false;
+    }else{
+      if(ch==='"')inStr=true;
+      else if(ch==='[')depth++;
+      else if(ch===']'){
+        depth--;
+        if(depth===0){
+          try{return JSON.parse(text.slice(start,i+1))}catch{return null}
+        }
+      }
+    }
+  }
+  return null;
+}
+
+async function ensureSoundCloudClientId(){
+  if(scClientId)return scClientId;
+  const html=await fetchViaProxy('https://soundcloud.com',false);
+  const hydration=extractBalancedArray(html,'window.__sc_hydration');
+  const apiClient=Array.isArray(hydration)?hydration.find(x=>x&&x.hydratable==='apiClient'):null;
+  const cid=apiClient?.data?.id;
+  if(cid){
+    scClientId=cid;
+    LS.set('sc_cid',cid);
+    return cid;
+  }
+  throw Error('Could not obtain SoundCloud client_id');
+}
+
+async function searchSoundCloud(q){
+  $('#st').textContent='Searching SoundCloud (filtering out 30s previews)…';
+  let items=[];
+  try{
+    const cid=await ensureSoundCloudClientId();
+    const apiUrl=`https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(q)}&client_id=${encodeURIComponent(cid)}&limit=35`;
+    const data=await fetchViaProxy(apiUrl,true);
+    items=Array.isArray(data?.collection)?data.collection:[];
+  }catch{
+    // Fallback: extract tracks from SoundCloud web search hydration JSON
+    const html=await fetchViaProxy(`https://soundcloud.com/search/sounds?q=${encodeURIComponent(q)}`,false);
+    const hydration=extractBalancedArray(html,'window.__sc_hydration')||[];
+    for(const entry of hydration){
+      if(Array.isArray(entry?.data?.collection))items.push(...entry.data.collection);
+      else if(entry?.hydratable==='sound'&&entry?.data)items.push(entry.data);
+    }
+  }
+
+  const totalRaw=items.length;
+  scTracks=items.filter(isSoundCloudFullTrack).map(mapSoundCloudTrack);
+  const skipped=Math.max(0,totalRaw-scTracks.length);
+  renderList();
+
+  if(!scTracks.length){
+    $('#st').textContent=totalRaw
+      ?`All ${totalRaw} SoundCloud results were 30-second Go+ previews and were excluded.`
+      :`No full-length SoundCloud tracks found for "${q}".`;
+    return;
+  }
+  $('#st').textContent=skipped
+    ?`Loaded ${scTracks.length} full tracks (${skipped} 30-second Go+ previews excluded).`
+    :'';
+  playTrack(0);
+}
+
+/* =========================================================================
+   3. AUDIO.COM ENGINE (Public Search + Official Embed Player)
+   ========================================================================= */
+function mapAudioComTrack(item){
+  const id=String(item.id||item.audioId||'');
+  const slug=item.slug||'';
+  const owner=item.user?.username||item.author?.username||item.owner?.username||item.username||'';
+  const title=item.title||item.name||'Untitled';
+  const artist=item.user?.name||item.author?.name||owner||'audio.com Creator';
+  const fb=fallbackArt(title,artist);
+  const cover=item.cover?.url||item.coverUrl||item.image||item.artwork||fb;
+  const pageUrl=item.url||(owner&&slug?`https://audio.com/${owner}/audio/${slug}`:`https://audio.com/audio/${id}`);
+  return{
+    engine:'audiocom',
+    id,
+    pageUrl,
+    embedUrl:`https://audio.com/embed/audio/${encodeURIComponent(id)}?theme=image&autoplay=1`,
+    title,
+    artist,
+    verified:false,
+    meta:item.category||'audio.com',
+    plays:item.playsCount||item.plays||0,
+    duration:Math.round(Number(item.duration||0)),
+    thumbSm:cover,
+    thumbLg:cover,
+    fallback:fb
+  };
+}
+
+function collectAudioComItems(node,out=[],seen=new Set()){
+  if(!node||typeof node!=='object'||out.length>=25)return out;
+  if((node.id||node.audioId)&&(node.title||node.name)&&(node.slug||node.duration!==undefined||node.category)){
+    const id=String(node.id||node.audioId);
+    if(/^\d{6,}$/.test(id)&&!seen.has(id)){
+      seen.add(id);
+      out.push(mapAudioComTrack(node));
+      return out;
+    }
+  }
+  for(const k of Object.keys(node)){
+    collectAudioComItems(node[k],out,seen);
+    if(out.length>=25)break;
+  }
+  return out;
+}
+
+async function searchAudioCom(q){
+  $('#st').textContent='Searching audio.com…';
+  let found=[];
+
+  // 1. Official api.audio.com/v1/search (works with optional OAuth Bearer token or open access)
+  try{
+    const headers={Accept:'application/json'};
+    if(acToken)headers.Authorization=`Bearer ${acToken}`;
+    const r=await fetch(`https://api.audio.com/v1/search?q=${encodeURIComponent(q)}&type=audio&per-page=25`,{
+      headers,
+      signal:AbortSignal.timeout(7000)
+    });
+    if(r.ok){
+      const d=await r.json();
+      const arr=d.data||d.items||d.results||[];
+      found=arr.map(mapAudioComTrack).filter(x=>x.id);
+    }
+  }catch{}
+
+  // 2. Keyless public web search fallback via audio.com page data
+  if(!found.length){
+    const html=await fetchViaProxy(`https://audio.com/search?q=${encodeURIComponent(q)}`,false);
+    const m=html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if(m){
+      try{
+        const nextData=JSON.parse(m[1]);
+        found=collectAudioComItems(nextData);
+      }catch{}
+    }
+    if(!found.length){
+      // Fallback regex scan for /embed/audio/{id} or /audio/{slug} blocks
+      const idMatches=[...html.matchAll(/"id"\s*:\s*"?(\d{12,20})"?[^}]{0,300}?"title"\s*:\s*"([^"]+)"/g)];
+      const seen=new Set();
+      for(const match of idMatches){
+        if(seen.has(match[1]))continue;
+        seen.add(match[1]);
+        found.push(mapAudioComTrack({id:match[1],title:match[2]}));
+      }
+    }
+  }
+
+  acTracks=found;
+  renderList();
+  $('#st').textContent=acTracks.length?'':`No tracks found on audio.com for "${q}".`;
+  if(acTracks.length)playTrack(0);
+}
+
+/* =========================================================================
+   4. UNIFIED PLAYBACK & CONTROLS
+   ========================================================================= */
+function initSoundCloudWidget(){
+  if(!window.SC||!window.SC.Widget)return;
+  scWidget=window.SC.Widget($('#sc-frame'));
+  scWidget.bind(window.SC.Widget.Events.READY,()=>{scReady=true;});
+  scWidget.bind(window.SC.Widget.Events.PLAY,()=>{
+    if(activeEngine!=='soundcloud')return;
+    scPaused=false;
+    $('#pp').textContent='⏸';
+    $('#badge').textContent='Now playing';
+    scWidget.getDuration(ms=>{
+      scDurationSec=Math.round((ms||0)/1000);
+      if(scDurationSec&&queue[idx]){
+        queue[idx].duration=scDurationSec;
+        $('#t1').textContent=fmt(scDurationSec);
+        renderList();
+      }
+    });
+  });
+  scWidget.bind(window.SC.Widget.Events.PAUSE,()=>{
+    if(activeEngine!=='soundcloud')return;
+    scPaused=true;
+    $('#pp').textContent='▶';
+    $('#badge').textContent='Paused';
+  });
+  scWidget.bind(window.SC.Widget.Events.FINISH,()=>{
+    if(activeEngine==='soundcloud')nextTrack(true);
+  });
+  scWidget.bind(window.SC.Widget.Events.PLAY_PROGRESS,ev=>{
+    if(activeEngine!=='soundcloud'||drag)return;
+    const cur=(ev.currentPosition||0)/1000;
+    const dur=scDurationSec||(queue[idx]?.duration||0);
+    updateProgressUI(cur,dur);
+    if(ev.loadedProgress)$('#buf').style.width=Math.min(100,ev.loadedProgress*100)+'%';
+  });
+}
+initSoundCloudWidget();
+
+function stopAllEngines(){
+  aud.pause();
+  aud.removeAttribute('src');
+  if(scReady&&scWidget){
+    try{scWidget.pause();}catch{}
+  }
+  $('#ac-frame').src='about:blank';
+}
+
+function getActiveList(){
+  if(source==='audius')return audiusTab==='trend'?trendTracks:audiusSearchTracks;
+  if(source==='soundcloud')return scTracks;
+  return acTracks;
+}
+
+function updateProgressUI(cur,dur){
+  const pct=dur>0?Math.min(100,Math.max(0,(cur/dur)*100)):0;
+  $('#fill').style.width=pct+'%';
+  if(!drag)$('#seek').value=Math.round(pct*10);
+  $('#t0').textContent=fmt(cur);
+  $('#t1').textContent=fmt(dur);
+}
+
+function playTrack(i){
+  const list=getActiveList();
+  queue=list;
+  if(i<0||i>=queue.length)return;
+  idx=i;
+  streamRetries=0;
+  const t=queue[idx];
+  activeEngine=t.engine;
+
+  stopAllEngines();
+  $('#deck').hidden=false;
+
+  const art=$('#art');
+  art.onerror=()=>{art.onerror=null;art.src=t.fallback;};
+  art.src=t.thumbLg;
+
+  $('#tt').textContent=t.title;
+  $('#mt').innerHTML=`${esc(t.artist)}${t.verified?'<span class="verified">✓</span>':''}`;
+  $('#src-pill').textContent=t.engine==='audius'?'Audius':t.engine==='soundcloud'?'SoundCloud · Full Track':'audio.com';
+  $('#buf').style.width='0%';
+  updateProgressUI(0,t.duration);
+  document.title=`${t.title} · ${t.artist}`;
+  renderList();
+
+  if('mediaSession' in navigator){
+    navigator.mediaSession.metadata=new MediaMetadata({
+      title:t.title,
+      artist:t.artist,
+      artwork:[{src:t.thumbLg}]
+    });
+  }
+
+  if(t.engine==='audius'){
+    $('#native-ctl').hidden=false;
+    $('#ac-embed-wrap').hidden=true;
+    $('#badge').textContent='Loading audio…';
+    aud.src=audiusStreamUrl(t.id,audiusHostIdx);
+    aud.load();
+    aud.play().catch(()=>{$('#badge').textContent='Press ▶ to play';});
+  }else if(t.engine==='soundcloud'){
+    $('#native-ctl').hidden=false;
+    $('#ac-embed-wrap').hidden=true;
+    $('#badge').textContent='Loading SoundCloud…';
+    scDurationSec=t.duration||0;
+    if(scReady&&scWidget){
+      scWidget.load(t.permalinkUrl,{
+        auto_play:true,
+        show_artwork:false,
+        buying:false,
+        sharing:false,
+        download:false,
+        show_comments:false
+      });
+      scWidget.setVolume(+$('#vol').value);
+    }else{
+      $('#sc-frame').src=`https://w.soundcloud.com/player/?url=${encodeURIComponent(t.permalinkUrl)}&auto_play=true`;
+      setTimeout(initSoundCloudWidget,800);
+    }
+  }else if(t.engine==='audiocom'){
+    $('#native-ctl').hidden=true;
+    $('#ac-embed-wrap').hidden=false;
+    $('#badge').textContent='audio.com Player';
+    $('#ac-frame').src=t.embedUrl;
+  }
+}
+
+function nextTrack(auto=false){
+  if(!queue.length)return;
+  if(auto&&repeat===2){
+    if(activeEngine==='audius'){aud.currentTime=0;aud.play();}
+    else if(activeEngine==='soundcloud'&&scWidget){scWidget.seekTo(0);scWidget.play();}
+    return;
+  }
+  if(shuffle&&queue.length>1){
+    let r=idx;
+    while(r===idx)r=Math.floor(Math.random()*queue.length);
+    playTrack(r);
+    return;
+  }
+  if(idx+1<queue.length)playTrack(idx+1);
+  else if(repeat===1)playTrack(0);
+  else{$('#pp').textContent='▶';$('#badge').textContent='Finished';}
+}
+
+function prevTrack(){
+  if(!queue.length)return;
+  if(activeEngine==='audius'&&aud.currentTime>3){aud.currentTime=0;return;}
+  if(activeEngine==='soundcloud'&&scWidget){
+    scWidget.getPosition(ms=>{
+      if(ms>3000)scWidget.seekTo(0);
+      else if(idx>0)playTrack(idx-1);
+    });
+    return;
+  }
+  if(idx>0)playTrack(idx-1);
+  else if(repeat===1)playTrack(queue.length-1);
+}
+
+/* ---- Native <audio> Events ---- */
+aud.addEventListener('playing',()=>{
+  if(activeEngine!=='audius')return;
+  streamRetries=0;
+  $('#pp').textContent='⏸';
+  $('#badge').textContent='Now playing';
+});
+aud.addEventListener('pause',()=>{
+  if(activeEngine!=='audius')return;
+  $('#pp').textContent='▶';
+  if(!aud.ended)$('#badge').textContent='Paused';
+});
+aud.addEventListener('waiting',()=>{
+  if(activeEngine==='audius')$('#badge').textContent='Buffering…';
+});
+aud.addEventListener('ended',()=>{if(activeEngine==='audius')nextTrack(true);});
+aud.addEventListener('timeupdate',()=>{
+  if(activeEngine!=='audius'||drag)return;
+  const dur=Number.isFinite(aud.duration)?aud.duration:(queue[idx]?.duration||0);
+  updateProgressUI(aud.currentTime||0,dur);
+});
+aud.addEventListener('progress',()=>{
+  if(activeEngine!=='audius')return;
+  const dur=aud.duration;
+  if(dur>0&&aud.buffered.length){
+    const end=aud.buffered.end(aud.buffered.length-1);
+    $('#buf').style.width=Math.min(100,(end/dur)*100)+'%';
+  }
+});
+aud.addEventListener('error',()=>{
+  if(activeEngine!=='audius')return;
+  const t=queue[idx];
+  if(!t)return;
+  if(streamRetries<Math.min(audiusHosts.length-1,2)){
+    streamRetries++;
+    const nextHost=(audiusHostIdx+streamRetries)%audiusHosts.length;
+    $('#badge').textContent='Switching node…';
+    aud.src=audiusStreamUrl(t.id,nextHost);
+    aud.play().catch(()=>{});
+    return;
+  }
+  $('#badge').textContent='Stream error';
+  $('#st').textContent=`Could not stream "${t.title}". Try another track.`;
+});
+
+/* ---- Transport, Scrubber & Volume ---- */
+$('#pp').onclick=()=>{
+  if(activeEngine==='audius'){
+    aud.paused?aud.play():aud.pause();
+  }else if(activeEngine==='soundcloud'&&scWidget){
+    scPaused?scWidget.play():scWidget.pause();
+  }
+};
+$('#nt').onclick=()=>nextTrack(false);
+$('#pv').onclick=()=>prevTrack();
+
+$('#shuf').onclick=()=>{
+  shuffle=!shuffle;
+  $('#shuf').classList.toggle('on',shuffle);
+};
+$('#rep').onclick=()=>{
+  repeat=(repeat+1)%3;
+  const btn=$('#rep');
+  btn.classList.toggle('on',repeat>0);
+  btn.textContent=repeat===2?'🔂':'🔁';
+  btn.title=repeat===0?'Repeat: Off':repeat===1?'Repeat: All':'Repeat: One';
+};
+
+$('#seek').oninput=()=>{
+  drag=true;
+  const dur=activeEngine==='audius'
+    ?(Number.isFinite(aud.duration)?aud.duration:(queue[idx]?.duration||0))
+    :(scDurationSec||queue[idx]?.duration||0);
+  const target=(+$('#seek').value/1000)*dur;
+  $('#fill').style.width=(+$('#seek').value/10)+'%';
+  $('#t0').textContent=fmt(target);
+};
+$('#seek').onchange=()=>{
+  const pct=+$('#seek').value/1000;
+  if(activeEngine==='audius'&&Number.isFinite(aud.duration)){
+    aud.currentTime=pct*aud.duration;
+  }else if(activeEngine==='soundcloud'&&scWidget){
+    const dur=scDurationSec||queue[idx]?.duration||0;
+    if(dur>0)scWidget.seekTo(pct*dur*1000);
+  }
+  drag=false;
+};
+
+const savedVol=Math.min(100,Math.max(0,+LS.get('vol',100)));
+$('#vol').value=savedVol;
+aud.volume=savedVol/100;
+$('#mut').textContent=savedVol===0?'🔇':'🔊';
+
+$('#vol').oninput=()=>{
+  const v=+$('#vol').value;
+  aud.muted=false;
+  aud.volume=v/100;
+  if(scReady&&scWidget)scWidget.setVolume(v);
+  LS.set('vol',v);
+  $('#mut').textContent=v===0?'🔇':'🔊';
+};
+$('#mut').onclick=()=>{
+  aud.muted=!aud.muted;
+  const muted=aud.muted||aud.volume===0;
+  if(scReady&&scWidget)scWidget.setVolume(muted?0:+$('#vol').value);
+  $('#mut').textContent=muted?'🔇':'🔊';
+};
+
+/* ---- Rendering ---- */
+function renderSubControls(){
+  document.querySelectorAll('.src-btn').forEach(b=>b.classList.toggle('on',b.dataset.src===source));
+  $('#audius-bar').hidden=source!=='audius';
+  document.querySelectorAll('#audius-bar nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===audiusTab));
+  const genres=$('#genres');
+  genres.hidden=!(source==='audius'&&audiusTab==='trend');
+  genres.innerHTML=GENRES.map(g=>`<button type="button" class="pill${g===activeGenre?' on':''}" data-g="${esc(g)}">${esc(g)}</button>`).join('');
+}
+
+function renderList(){
+  const list=getActiveList();
+  const currentId=queue[idx]?.id;
+  if(!list.length){
+    const hint=source==='audius'
+      ?'Search Audius above or pick a trending genre.'
+      :source==='soundcloud'
+        ?'Search SoundCloud above (30-second Go+ previews are automatically filtered out) or paste a SoundCloud URL.'
+        :'Search audio.com above or paste an audio.com track URL.';
+    $('#ls').innerHTML=`<p class="msg">${hint}</p>`;
+    return;
+  }
+  $('#ls').innerHTML=list.map((t,i)=>`
+    <div class="row${t.id===currentId?' active':''}" data-i="${i}">
+      <img src="${esc(t.thumbSm)}" onerror="this.onerror=null;this.src='${esc(t.fallback)}'" alt="">
+      <div class="meta">
+        <b>${esc(t.title)}</b>
+        <small>${esc(t.artist)}${t.verified?'<span class="verified" title="Verified">✓</span>':''}${t.meta?' · '+esc(t.meta):''}${t.plays?' · '+fmtPlays(t.plays):''}</small>
+      </div>
+      <span class="dur">${t.duration?fmt(t.duration):''}</span>
+    </div>
+  `).join('');
+}
+
+/* ---- Direct URL Handler & Search Submit ---- */
+async function handleDirectUrl(url){
+  if(/soundcloud\.com\//i.test(url)){
+    source='soundcloud';
+    renderSubControls();
+    $('#st').textContent='Loading SoundCloud link…';
+    try{
+      const cid=await ensureSoundCloudClientId();
+      const data=await fetchViaProxy(`https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(url)}&client_id=${encodeURIComponent(cid)}`,true);
+      if(data&&data.kind==='track'){
+        if(!isSoundCloudFullTrack(data)){
+          $('#st').textContent='This SoundCloud link is a 30-second Go+ preview and was excluded.';
+          return;
+        }
+        scTracks=[mapSoundCloudTrack(data)];
+      }else if(data&&Array.isArray(data.tracks)){
+        scTracks=data.tracks.filter(isSoundCloudFullTrack).map(mapSoundCloudTrack);
+      }
+    }catch{
+      scTracks=[{
+        engine:'soundcloud',
+        id:url,
+        permalinkUrl:url,
+        title:url.split('/').filter(Boolean).pop().replace(/-/g,' '),
+        artist:'SoundCloud Track',
+        verified:false,
+        meta:'Direct Link',
+        plays:0,
+        duration:0,
+        thumbSm:fallbackArt('SC','SoundCloud'),
+        thumbLg:fallbackArt('SC','SoundCloud'),
+        fallback:fallbackArt('SC','SoundCloud')
+      }];
+    }
+    renderList();
+    $('#st').textContent='';
+    if(scTracks.length)playTrack(0);
+    return true;
+  }
+
+  const acMatch=url.match(/audio\.com\/(?:[^/]+\/audio\/|audio\/|embed\/audio\/)([^/?#]+)/i);
+  if(acMatch){
+    source='audiocom';
+    renderSubControls();
+    const rawId=acMatch[1];
+    acTracks=[mapAudioComTrack({id:rawId,title:`audio.com Track (${rawId})`})];
+    renderList();
+    $('#st').textContent='';
+    playTrack(0);
+    return true;
+  }
+  return false;
+}
+
+$('#f').onsubmit=async e=>{
+  e.preventDefault();
+  const q=$('#q').value.trim();
+  if(!q)return;
+  if(/^https?:\/\//i.test(q)&&await handleDirectUrl(q))return;
+
+  try{
+    if(source==='audius')await searchAudius(q);
+    else if(source==='soundcloud')await searchSoundCloud(q);
+    else await searchAudioCom(q);
+  }catch(err){
+    $('#st').textContent='Search error: '+err.message;
+  }
+};
+
+document.querySelectorAll('.src-btn').forEach(b=>b.onclick=()=>{
+  source=b.dataset.src;
+  $('#st').textContent='';
+  renderSubControls();
+  renderList();
+  const q=$('#q').value.trim();
+  if(q&&!getActiveList().length)$('#f').requestSubmit();
+});
+
+document.querySelectorAll('#audius-bar nav button').forEach(b=>b.onclick=()=>{
+  audiusTab=b.dataset.tab;
+  renderSubControls();
+  renderList();
+});
+
+$('#genres').onclick=e=>{
+  const p=e.target.closest('.pill');
+  if(p)loadAudiusTrending(p.dataset.g);
+};
+
+$('#ls').onclick=e=>{
+  const r=e.target.closest('.row');
+  if(r)playTrack(+r.dataset.i);
+};
+
+$('#gear').onclick=()=>$('#set').hidden=!$('#set').hidden;
+$('#save-set').onclick=()=>{
+  acToken=$('#ac-tok').value.trim();
+  scClientId=$('#sc-cid').value.trim();
+  LS.set('ac_tok',acToken);
+  LS.set('sc_cid',scClientId);
+  $('#set').hidden=true;
+  $('#st').textContent='Settings saved.';
+};
+
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT')return;
+  if(e.code==='Space'&&activeEngine!=='audiocom'){
+    e.preventDefault();
+    $('#pp').click();
+  }else if(e.code==='ArrowRight'&&activeEngine==='audius'&&Number.isFinite(aud.duration)){
+    aud.currentTime=Math.min(aud.duration,aud.currentTime+5);
+  }else if(e.code==='ArrowLeft'&&activeEngine==='audius'){
+    aud.currentTime=Math.max(0,aud.currentTime-5);
+  }
+});
+
+if('mediaSession' in navigator){
+  navigator.mediaSession.setActionHandler('play',()=>$('#pp').click());
+  navigator.mediaSession.setActionHandler('pause',()=>$('#pp').click());
+  navigator.mediaSession.setActionHandler('nexttrack',()=>nextTrack(false));
+  navigator.mediaSession.setActionHandler('previoustrack',()=>prevTrack());
+}
+
+renderSubControls();
+loadAudiusTrending('All');
+</script>
+</body>
+</html>
