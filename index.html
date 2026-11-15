@@ -399,8 +399,10 @@ async function search(q){
     }
   }
 
-  const [vidRes,ytmRes]=await Promise.allSettled([
+  // Search standard videos, lyric uploads (embeddable for major-label artists), and YouTube Music covers in parallel
+  const [vidRes,lyrRes,ytmRes]=await Promise.allSettled([
     piped('/search?q='+encodeURIComponent(q)+'&filter=videos'),
+    piped('/search?q='+encodeURIComponent(q+' lyrics')+'&filter=videos'),
     piped('/search?q='+encodeURIComponent(q)+'&filter=music_songs')
   ]);
 
@@ -411,17 +413,30 @@ async function search(q){
     });
   }
 
-  let tracks=[];
-  if(vidRes.status==='fulfilled'){
-    tracks=(vidRes.value.items||[]).filter(isSong).map(fromPiped);
+  const raw=[];
+  const seenLocal=new Set();
+  for(const res of [lyrRes,vidRes]){
+    if(res.status!=='fulfilled')continue;
+    for(const item of (res.value.items||[]).filter(isSong)){
+      const t=fromPiped(item);
+      if(t.id&&!seenLocal.has(t.id)){
+        seenLocal.add(t.id);
+        raw.push(t);
+      }
+    }
+  }
+
+  let tracks=raw;
+  if(!tracks.length){
+    try{tracks=await invidiousSearch(q+' lyrics')}catch{}
   }
   if(!tracks.length){
-    try{tracks=await invidiousSearch(q)}catch{}
-  }
-  if(!tracks.length){
-    try{tracks=await youtubeDirectSearch(q)}catch{}
+    try{tracks=await youtubeDirectSearch(q+' lyrics')}catch{}
   }
   if(!tracks.length)throw Error('Search mirrors are busy right now. Try again in a moment or add a free YouTube API key in ⚙.');
+
+  // Put embeddable non-VEVO/non-Topic uploads first so major-label tracks play immediately
+  tracks.sort((a,b)=>(isMajorOfficial(a.rawUploader)?1:0)-(isMajorOfficial(b.rawUploader)?1:0));
   return tracks;
 }
 
@@ -454,7 +469,6 @@ async function gatherAltCandidates(track){
     }
   }));
 
-  // Prioritize community lyric/audio uploads over VEVO/Topic channels that also carry 152-4 blocks
   pool.sort((a,b)=>(isMajorOfficial(a.rawUploader)?1:0)-(isMajorOfficial(b.rawUploader)?1:0));
   return pool.slice(0,5).map(x=>x.id);
 }
@@ -485,7 +499,6 @@ function loadVideo(videoId){
   if(!userMuted)player.unMute();
   player.playVideo();
 
-  // 1. Muted kickstart at 1.1s in case browser autoplay policy requires muted start
   kickTimer=setTimeout(()=>{
     const st=player.getPlayerState?.();
     if(st!==1&&st!==3){
@@ -494,7 +507,6 @@ function loadVideo(videoId){
     }
   },1100);
 
-  // 2. If still not playing at 2.6s, YouTube rendered Error 152-4 inside the hidden iframe — swap source automatically
   verifyTimer=setTimeout(()=>{
     const st=player.getPlayerState?.();
     if(st===1||st===3)return;
@@ -507,7 +519,6 @@ async function handleBlockedStream(){
   if(!cur)return;
   const myToken=playToken;
 
-  // Try next queued alternative upload of this exact song
   while(altQueue.length){
     const nextAlt=altQueue.shift();
     if(!badIds.has(nextAlt)){
@@ -518,7 +529,6 @@ async function handleBlockedStream(){
     }
   }
 
-  // Gather alternative lyric/audio/live uploads of this exact song
   if(!cur.searchedAlts){
     cur.searchedAlts=true;
     $('#state-badge').textContent='Finding embeddable audio…';
@@ -533,7 +543,6 @@ async function handleBlockedStream(){
     }
   }
 
-  // No embeddable upload exists for this song — skip to next track in list
   $('#st').textContent=`Label blocked embedding for "${cur.title}" — skipped to next track.`;
   skip(true);
 }
@@ -564,11 +573,8 @@ function play(t,back){
   draw();
   document.title=t.title+' · '+t.artist;
 
-  // Start loading immediately inside user gesture so browser permits audio playback
   const startId=badIds.has(t.streamId)?t.id:t.streamId;
   loadVideo(startId);
-
-  // Align cover art & fetch Up Next queue in parallel
   alignCover(t);
 
   if('mediaSession' in navigator){
@@ -690,6 +696,7 @@ if('mediaSession' in navigator){
   navigator.mediaSession.setActionHandler('pause',()=>player.pauseVideo());
 }
 if(location.protocol=='file:')$('#st').textContent='Serve this page over http://localhost or HTTPS so YouTube allows embeds.';
+else if(window.top!==window.self)$('#st').textContent='Note: running inside a sandboxed preview frame may cause YouTube to block embeds (Error 152-4). Open directly in a browser tab.';
 draw();
 </script>
 </body>
