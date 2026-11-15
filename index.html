@@ -19,19 +19,13 @@ button{font:inherit;cursor:pointer;border:0}
 #set{margin-bottom:14px;padding:12px;background:var(--sf);border-radius:10px;display:flex;flex-wrap:wrap;gap:8px}
 #set small{flex-basis:100%;color:var(--mu)}
 
-/* Audio deck: 200x200 hidden video iframe sits behind the 200x200 album cover */
+/* Pure audio deck: 200x200 hidden video iframe stays permanently behind the 200x200 album cover */
 #deck{background:var(--sf);border:1px solid var(--ln);border-radius:16px;padding:18px;margin-bottom:14px;display:flex;gap:20px;align-items:center}
 @media(max-width:580px){#deck{flex-direction:column;text-align:center}}
 #cover-box{position:relative;width:200px;height:200px;flex:none;border-radius:12px;overflow:hidden;background:#120f20;box-shadow:0 8px 24px rgba(0,0,0,.35)}
 #cover-box iframe{position:absolute;inset:0;width:200px;height:200px;border:0;z-index:1;pointer-events:none}
-#art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;background:var(--bg);transition:opacity .2s}
+#art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;background:var(--bg)}
 #art.crop43{transform:scale(1.36)}
-#tap-hint{display:none;position:absolute;inset:x:0;bottom:0;z-index:5;background:rgba(28,24,48,.92);color:var(--ac);font-size:12px;font-weight:700;padding:6px;text-align:center;pointer-events:none}
-
-/* Only surface the iframe when a verified playable video needs a direct browser click */
-#cover-box.needs-tap iframe{z-index:4;pointer-events:auto}
-#cover-box.needs-tap #art{opacity:.25;pointer-events:none}
-#cover-box.needs-tap #tap-hint{display:block}
 
 .info{flex:1;min-width:0;width:100%}
 .badge{color:var(--ac);font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:11px}
@@ -79,7 +73,6 @@ nav button.on{color:var(--tx);border-color:var(--ac)}
     <div id="cover-box">
       <div id="yt"></div>
       <img id="art" alt="Album cover">
-      <div id="tap-hint">Click player above to start audio</div>
     </div>
     <div class="info">
       <span class="badge" id="state-badge">Now playing</span>
@@ -132,14 +125,14 @@ let INVIDIOUS=[
 
 const $=s=>document.querySelector(s);
 const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
-let key=LS.get('key','')||BUILT_IN_KEY,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},ytmCovers=[],fails=0,drag=0,userMuted=false,kickTimer=null,verifyTimer=null,playToken=0,triedExact=false;
-const embedCache=new Map();
+let key=LS.get('key','')||BUILT_IN_KEY,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},ytmCovers=[],fails=0,drag=0,userMuted=false,kickTimer=null,verifyTimer=null,playToken=0,altQueue=[];
+const badIds=new Set();
 
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=s=>s>=0?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'0:00';
 const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.value};
 
-/* ---- dynamically discover live Piped & Invidious instances in background ---- */
+/* ---- discover live Piped & Invidious instances in background ---- */
 (async function discoverInstances(){
   try{
     const r=await fetch('https://piped-instances.kavin.rocks/',{signal:AbortSignal.timeout(5000)});
@@ -161,34 +154,7 @@ const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.
   }catch{}
 })();
 
-/* ---- CORS-compatible embed check via noembed.com (returns true, false, or null if unknown) ---- */
-async function canEmbed(videoId){
-  if(!videoId)return false;
-  if(embedCache.has(videoId))return embedCache.get(videoId);
-  const ctrl=new AbortController();
-  const tm=setTimeout(()=>ctrl.abort(),3500);
-  try{
-    const url=`https://noembed.com/embed?url=${encodeURIComponent('https://www.youtube.com/watch?v='+videoId)}`;
-    const r=await fetch(url,{signal:ctrl.signal});
-    if(!r.ok)return null;
-    const d=await r.json();
-    if(d&&d.error){
-      embedCache.set(videoId,false);
-      return false;
-    }
-    if(d&&d.title){
-      embedCache.set(videoId,true);
-      return true;
-    }
-    return null;
-  }catch{
-    return null;
-  }finally{
-    clearTimeout(tm);
-  }
-}
-
-/* ---- title cleaning & strict YouTube Music cover matching ---- */
+/* ---- title cleaning & YouTube Music cover alignment ---- */
 const JUNK=/\s*[\(\[][^\)\]]*(official|audio|lyric|video|visuali[sz]er|remaster|hd|4k|hq|live|version|explicit)[^\)\]]*[\)\]]/ig;
 const STOP=new Set(['the','and','for','with','feat','ft','official','audio','video','live','version','cover','like','from','song','music','lyrics']);
 
@@ -201,6 +167,7 @@ function tidy(title,up){
 }
 const norm=s=>(s||'').toLowerCase().replace(JUNK,'').replace(/\b(ft|feat|featuring)\b.*/g,'').replace(/[^a-z0-9\u00c0-\u024f]+/g,' ').trim();
 const tokens=s=>norm(s).split(' ').filter(w=>w.length>=3&&!STOP.has(w));
+const isMajorOfficial=up=>/VEVO$|\s-\sTopic$/i.test(up||'');
 
 function cleanQueryForCover(track){
   const qm=track.title.match(/['"‘“]([^'"’”]{2,})['"’”]/);
@@ -296,6 +263,7 @@ const mk=(id,title,up,dur,rawThumb)=>{
   const t={
     id,
     streamId:id,
+    rawUploader:up||'',
     title:info.title,
     artist:info.artist,
     duration:dur||null,
@@ -457,15 +425,16 @@ async function search(q){
   return tracks;
 }
 
-/* ---- find an embeddable lyric/audio upload when a label blocks the official video ---- */
-async function findEmbeddableAlt(track){
+/* ---- find embeddable lyric/audio/live uploads of the exact song when official VEVO/Topic is 152-4 blocked ---- */
+async function gatherAltCandidates(track){
   const tTok=tokens(track.title);
   const queries=[
     `${track.artist} ${track.title} lyrics`,
-    `${track.artist} ${track.title} audio`
+    `${track.artist} ${track.title} audio`,
+    `${track.artist} ${track.title} live`
   ];
   const pool=[];
-  const seenLocal=new Set([track.id,track.streamId]);
+  const seenLocal=new Set([track.id,track.streamId,...badIds]);
 
   await Promise.allSettled(queries.map(async q=>{
     let items=[];
@@ -476,35 +445,18 @@ async function findEmbeddableAlt(track){
       try{items=await youtubeDirectSearch(q)}catch{}
     }
     for(const cand of items){
-      if(seenLocal.has(cand.id)||seen.has(cand.id)||embedCache.get(cand.id)===false)continue;
+      if(seenLocal.has(cand.id)||badIds.has(cand.id))continue;
       seenLocal.add(cand.id);
       const cTok=tokens(cand.title);
       const titleMatch=!tTok.length||tTok.some(w=>cTok.includes(w));
-      const durOk=!track.duration||!cand.duration||Math.abs(track.duration-cand.duration)<=45;
+      const durOk=!track.duration||!cand.duration||Math.abs(track.duration-cand.duration)<=50;
       if(titleMatch&&durOk)pool.push(cand);
     }
   }));
 
-  const top=pool.slice(0,8);
-  const checks=await Promise.all(top.map(async c=>({id:c.id,ok:await canEmbed(c.id)})));
-  const verified=checks.find(x=>x.ok===true);
-  if(verified)return verified.id;
-  const untried=checks.find(x=>x.ok!==false);
-  return untried?untried.id:null;
-}
-
-async function resolvePlayableId(track){
-  const status=await canEmbed(track.streamId);
-  if(status!==false)return track.streamId;
-
-  triedExact=true;
-  $('#state-badge').textContent='Finding embeddable audio…';
-  const altId=await findEmbeddableAlt(track);
-  if(altId){
-    track.streamId=altId;
-    return altId;
-  }
-  return null;
+  // Prioritize community lyric/audio uploads over VEVO/Topic channels that also carry 152-4 blocks
+  pool.sort((a,b)=>(isMajorOfficial(a.rawUploader)?1:0)-(isMajorOfficial(b.rawUploader)?1:0));
+  return pool.slice(0,5).map(x=>x.id);
 }
 
 async function related(t){
@@ -517,7 +469,7 @@ async function related(t){
   return search(t.artist);
 }
 
-/* ---- playback & dead-iframe detection ---- */
+/* ---- playback & silent 152-4 detection (video stays permanently behind album cover) ---- */
 function clearTimers(){
   clearTimeout(kickTimer);
   clearTimeout(verifyTimer);
@@ -526,14 +478,14 @@ function clearTimers(){
 function loadVideo(videoId){
   clearTimers();
   seen.add(videoId);
-  $('#cover-box').classList.remove('needs-tap');
   $('#state-badge').textContent='Loading audio…';
   if(!ready){pend=videoId;return;}
 
   player.loadVideoById(videoId);
+  if(!userMuted)player.unMute();
   player.playVideo();
 
-  // 1. Muted kickstart if browser blocks unmuted autoplay
+  // 1. Muted kickstart at 1.1s in case browser autoplay policy requires muted start
   kickTimer=setTimeout(()=>{
     const st=player.getPlayerState?.();
     if(st!==1&&st!==3){
@@ -542,25 +494,48 @@ function loadVideo(videoId){
     }
   },1100);
 
-  // 2. Verify whether the iframe actually loaded a playable video vs rendered Error 152-4
+  // 2. If still not playing at 2.6s, YouTube rendered Error 152-4 inside the hidden iframe — swap source automatically
   verifyTimer=setTimeout(()=>{
     const st=player.getPlayerState?.();
     if(st===1||st===3)return;
+    badIds.add(videoId);
+    handleBlockedStream();
+  },2600);
+}
 
-    const vData=player.getVideoData?.()||{};
-    const dur=player.getDuration?.()||0;
-    const isBlocked=!vData.title&&dur<=0;
+async function handleBlockedStream(){
+  if(!cur)return;
+  const myToken=playToken;
 
-    if(isBlocked){
-      // YouTube rendered Error 152-4 inside the iframe without firing onError — keep cover on and swap source
-      embedCache.set(videoId,false);
-      skip(true);
-    }else{
-      // Valid video is loaded and strictly waiting for a user tap to unmute/start
-      $('#state-badge').textContent='Tap cover to start';
-      $('#cover-box').classList.add('needs-tap');
+  // Try next queued alternative upload of this exact song
+  while(altQueue.length){
+    const nextAlt=altQueue.shift();
+    if(!badIds.has(nextAlt)){
+      cur.streamId=nextAlt;
+      $('#state-badge').textContent='Switching audio source…';
+      loadVideo(nextAlt);
+      return;
     }
-  },2400);
+  }
+
+  // Gather alternative lyric/audio/live uploads of this exact song
+  if(!cur.searchedAlts){
+    cur.searchedAlts=true;
+    $('#state-badge').textContent='Finding embeddable audio…';
+    const alts=await gatherAltCandidates(cur);
+    if(myToken!==playToken)return;
+    if(alts.length){
+      altQueue=alts;
+      const firstAlt=altQueue.shift();
+      cur.streamId=firstAlt;
+      loadVideo(firstAlt);
+      return;
+    }
+  }
+
+  // No embeddable upload exists for this song — skip to next track in list
+  $('#st').textContent=`Label blocked embedding for "${cur.title}" — skipped to next track.`;
+  skip(true);
 }
 
 const row=t=>`<div class="row${cur&&cur.id===t.id?' active':''}" data-id="${t.id}"><img src="${esc(t.thumb)}" onerror="this.src='https://i.ytimg.com/vi/${t.id}/hqdefault.jpg'" alt=""><div><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><small>${t.duration?fmt(t.duration):''}</small></div>`;
@@ -571,14 +546,15 @@ function draw(){
 }
 const meta=t=>{$('#mt').textContent=t.artist;$('#t1').textContent=fmt(t.duration||0)};
 
-async function play(t,back){
-  const myToken=++playToken;
+function play(t,back){
+  playToken++;
   clearTimers();
-  triedExact=false;
-  $('#cover-box').classList.remove('needs-tap');
+  altQueue=[];
 
   if(cur&&!back)hist.push(cur);
-  cur=t;seen.add(t.id);$('#st').textContent='';
+  cur=t;
+  seen.add(t.id);
+  $('#st').textContent='';
   $('#deck').hidden=false;
   setArt(t);
   $('#tt').textContent=t.title;
@@ -588,6 +564,11 @@ async function play(t,back){
   draw();
   document.title=t.title+' · '+t.artist;
 
+  // Start loading immediately inside user gesture so browser permits audio playback
+  const startId=badIds.has(t.streamId)?t.id:t.streamId;
+  loadVideo(startId);
+
+  // Align cover art & fetch Up Next queue in parallel
   alignCover(t);
 
   if('mediaSession' in navigator){
@@ -595,48 +576,24 @@ async function play(t,back){
   }
   related(t).then(r=>{
     r.forEach(x=>lib[x.id]=x);
-    next=r.filter(x=>!seen.has(x.id));
+    next=r.filter(x=>!seen.has(x.id)&&!badIds.has(x.id));
     draw();
   }).catch(()=>{});
-
-  const playableId=await resolvePlayableId(t);
-  if(myToken!==playToken)return;
-
-  if(!playableId){
-    $('#st').textContent=`Label disabled embedding for "${t.title}" — skipping to next playable track…`;
-    skip(true);
-    return;
-  }
-
-  loadVideo(playableId);
 }
 
-const skip=async bad=>{
+const skip=bad=>{
   clearTimers();
-  $('#cover-box').classList.remove('needs-tap');
-
-  // If the official video failed inside the iframe (Error 152-4), try finding an embeddable upload of this exact song first
-  if(bad===true&&cur&&!triedExact){
-    triedExact=true;
-    const myToken=playToken;
-    $('#state-badge').textContent='Finding embeddable audio…';
-    const altId=await findEmbeddableAlt(cur);
-    if(myToken!==playToken)return;
-    if(altId){
-      cur.streamId=altId;
-      loadVideo(altId);
-      return;
-    }
-  }
-
   const L=bad===true?[...results,...next]:[...next,...results];
-  const n=L.find(x=>!seen.has(x.id)&&embedCache.get(x.streamId)!==false);
+  const n=L.find(x=>!seen.has(x.id)&&!badIds.has(x.id));
   if(n)play(n);
-  else if(bad===true)$('#st').textContent='No more embeddable tracks in this list.';
+  else if(bad===true){
+    $('#state-badge').textContent='Unavailable';
+    $('#st').textContent='No embeddable tracks left in this list. Try another search.';
+  }
 };
 
 window.onYouTubeIframeAPIReady=()=>{
-  const pv={autoplay:1,playsinline:1,rel:0,enablejsapi:1,controls:1,disablekb:1,fs:0,iv_load_policy:3};
+  const pv={autoplay:1,playsinline:1,rel:0,enablejsapi:1,controls:0,disablekb:1,fs:0,iv_load_policy:3};
   if(location.origin.startsWith('http')){pv.origin=location.origin;pv.widget_referrer=location.href;}
   player=new YT.Player('yt',{width:'200',height:'200',playerVars:pv,events:{
     onReady(){
@@ -652,16 +609,22 @@ window.onYouTubeIframeAPIReady=()=>{
         fails=0;
         $('#st').textContent='';
         $('#state-badge').textContent='Now playing';
-        $('#cover-box').classList.remove('needs-tap');
         if(!userMuted&&player.isMuted?.()){
           player.unMute();
           player.setVolume(+$('#vol').value);
+          setTimeout(()=>{
+            if(player.getPlayerState?.()!==1){
+              $('#state-badge').textContent='Tap ▶ to unmute';
+            }
+          },250);
         }
         const d=player.getDuration()|0;
         if(cur&&d){cur.duration=d;meta(cur)}
       }else if(e.data==2){
         clearTimers();
-        $('#state-badge').textContent='Paused';
+        if($('#state-badge').textContent!=='Tap ▶ to unmute'){
+          $('#state-badge').textContent='Paused';
+        }
       }else if(e.data==3){
         $('#state-badge').textContent='Buffering…';
       }else if(e.data==0){
@@ -670,15 +633,14 @@ window.onYouTubeIframeAPIReady=()=>{
     },
     onError(e){
       clearTimers();
-      $('#cover-box').classList.remove('needs-tap');
-      if(cur)embedCache.set(cur.streamId,false);
+      if(cur)badIds.add(cur.streamId);
       fails++;
-      if(fails>=8){
+      if(fails>=10){
         $('#state-badge').textContent='Blocked';
         $('#st').textContent=`YouTube blocked playback (Error ${e.data}). Serve over http://localhost or HTTPS and disable extensions that block Referer headers.`;
         return;
       }
-      skip(true);
+      handleBlockedStream();
     }
   }});
 };
@@ -711,7 +673,10 @@ $('#pp').onclick=()=>{
   if(player.getPlayerState()==1){
     player.pauseVideo();
   }else{
-    if(!userMuted)player.unMute();
+    if(!userMuted){
+      player.unMute();
+      player.setVolume(+$('#vol').value||100);
+    }
     player.playVideo();
   }
 };
