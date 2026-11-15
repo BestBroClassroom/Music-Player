@@ -4,43 +4,51 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<title>Embed Player</title>
+<title>Audio Player</title>
 <style>
 :root{--bg:#1c1830;--sf:#272142;--ln:#3a3260;--tx:#f3effa;--mu:#a79fc4;--ac:#ffb347}
 *{box-sizing:border-box;margin:0}
 body{font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--tx);padding:16px}
 button{font:inherit;cursor:pointer;border:0}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-#f{display:flex;gap:8px;max-width:1000px;margin:0 auto 12px}
+#f{display:flex;gap:8px;max-width:960px;margin:0 auto 14px}
 #q,#key{flex:1;min-width:0;background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:10px 12px;color:var(--tx);font:inherit}
 #f button,#ks{background:var(--ac);color:#201400;border-radius:8px;padding:10px 16px;font-weight:600}
 #f .ghost{background:none;color:var(--mu);border:1px solid var(--ln);padding:10px 12px}
-#set{max-width:1000px;margin:0 auto 12px;padding:12px;background:var(--sf);border-radius:10px;display:flex;flex-wrap:wrap;gap:8px}
+#set{max-width:960px;margin:0 auto 14px;padding:12px;background:var(--sf);border-radius:10px;display:flex;flex-wrap:wrap;gap:8px}
 #set small{flex-basis:100%;color:var(--mu)}
-.grid{display:grid;grid-template-columns:1fr 340px;gap:24px;max-width:1000px;margin:auto;align-items:start}
-@media(max-width:760px){.grid{grid-template-columns:1fr}aside{order:-1}}
-aside{position:sticky;top:16px}
-#vid{aspect-ratio:16/9;min-width:200px;background:#000;border-radius:12px;overflow:hidden}
-#vid iframe{width:100%;height:100%;border:0}
-.ctl{display:flex;justify-content:center;gap:10px;margin-top:10px}
-.ctl button{width:46px;height:46px;border-radius:50%;font-size:20px;background:var(--sf);color:var(--tx)}
-#pp{background:var(--ac)!important;color:#201400!important}
-#hero{display:flex;gap:16px;align-items:center;margin-bottom:12px}
-#art{width:120px;height:120px;object-fit:cover;border-radius:12px;background:var(--sf);flex:none}
-#hero small{color:var(--mu)}
-#tt{font:700 30px/1.15 Georgia,serif;overflow-wrap:anywhere}
-#mt{color:var(--mu)}
-#st{color:var(--mu);min-height:1.4em;margin-bottom:4px}
+.wrap{max-width:960px;margin:auto;display:grid;grid-template-columns:1fr 210px;gap:20px;align-items:start}
+@media(max-width:720px){.wrap{grid-template-columns:1fr}}
+#deck{background:var(--sf);border:1px solid var(--ln);border-radius:14px;padding:16px;margin-bottom:12px}
+#hero{display:flex;gap:16px;align-items:center}
+#art{width:112px;height:112px;object-fit:cover;border-radius:10px;background:var(--bg);flex:none}
+#hero small{color:var(--ac);font-weight:600;text-transform:uppercase;letter-spacing:.05em;font-size:11px}
+#tt{font:700 24px/1.2 Georgia,serif;overflow-wrap:anywhere;margin:2px 0}
+#mt{color:var(--mu);font-size:14px}
+.scrub{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:12px;color:var(--mu);font-variant-numeric:tabular-nums}
+.scrub input,#vol{accent-color:var(--ac);cursor:pointer}
+#seek{flex:1}
+.ctl{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.btns{display:flex;align-items:center;gap:10px}
+.btns button,#mut{width:40px;height:40px;border-radius:50%;font-size:16px;background:var(--bg);color:var(--tx)}
+#pp{width:46px;height:46px;font-size:18px;background:var(--ac)!important;color:#201400!important}
+.volbox{display:flex;align-items:center;gap:6px}
+#vol{width:80px}
+#st{color:var(--mu);font-size:13px;min-height:1.3em;margin-bottom:6px}
 nav{display:flex;gap:4px;border-bottom:1px solid var(--ln);margin:8px 0}
 nav button{background:none;padding:8px 14px;color:var(--mu);border-bottom:2px solid transparent}
 nav button.on{color:var(--tx);border-color:var(--ac)}
-.row{display:flex;gap:12px;align-items:center;padding:6px;border-radius:8px;cursor:pointer}
+.row{display:flex;gap:12px;align-items:center;padding:7px;border-radius:8px;cursor:pointer}
 .row:hover{background:var(--sf)}
-.row img{width:64px;height:48px;object-fit:cover;border-radius:6px;flex:none}
-.row div{min-width:0}
+.row img{width:48px;height:48px;object-fit:cover;border-radius:6px;flex:none}
+.row div{min-width:0;flex:1}
 .row b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row small{color:var(--mu)}
 .msg{color:var(--mu);padding:12px 6px}
+aside{position:sticky;top:16px;text-align:center}
+#vid{width:200px;height:200px;margin:auto;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--ln)}
+#vid iframe{width:100%;height:100%;border:0}
+aside small{display:block;color:var(--mu);font-size:11px;margin-top:6px}
 </style>
 </head>
 <body>
@@ -52,37 +60,54 @@ nav button.on{color:var(--tx);border-color:var(--ac)}
 <div id="set" hidden>
   <input id="key" type="password" placeholder="YouTube Data API key (optional)" autocomplete="off">
   <button id="ks">Save</button>
-  <small>Without a key, search uses public Piped servers, which can be slow or down. A free YouTube Data API key makes search steadier. It is stored in this browser only.</small>
+  <small>Without a key, search uses public Piped servers. A free YouTube Data API key makes music search faster and steadier.</small>
 </div>
-<div class="grid">
-  <section>
-    <div id="hero" hidden><img id="art" alt=""><div><small>Now playing</small><h1 id="tt"></h1><p id="mt"></p></div></div>
+<div class="wrap">
+  <main>
+    <div id="deck" hidden>
+      <div id="hero">
+        <img id="art" alt="">
+        <div><small>Now playing</small><h1 id="tt"></h1><p id="mt"></p></div>
+      </div>
+      <div class="scrub">
+        <span id="t0">0:00</span>
+        <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+        <span id="t1">0:00</span>
+      </div>
+      <div class="ctl">
+        <div class="btns">
+          <button id="pv" aria-label="Previous">⏮</button>
+          <button id="pp" aria-label="Play or pause">▶</button>
+          <button id="nt" aria-label="Next">⏭</button>
+        </div>
+        <div class="volbox">
+          <button id="mut" aria-label="Mute or unmute">🔊</button>
+          <input id="vol" type="range" min="0" max="100" value="100" aria-label="Volume">
+        </div>
+      </div>
+    </div>
     <div id="st"></div>
-    <nav><button data-t="res" class="on">Results</button><button data-t="nx">Up next</button></nav>
+    <nav><button data-t="res" class="on">Tracks</button><button data-t="nx">Up next</button></nav>
     <div id="ls"></div>
-  </section>
+  </main>
   <aside>
     <div id="vid"><div id="yt"></div></div>
-    <div class="ctl">
-      <button id="pv" aria-label="Previous">⏮</button>
-      <button id="pp" aria-label="Play or pause">▶</button>
-      <button id="nt" aria-label="Next">⏭</button>
-    </div>
+    <small>YouTube audio source</small>
   </aside>
 </div>
 <script>
-const BUILT_IN_KEY=''; // optional: your own YouTube Data API key, restricted to this site's domain in Google Cloud
+const BUILT_IN_KEY='';
 const PIPED=['https://pipedapi.kavin.rocks','https://pipedapi.leptons.xyz','https://pipedapi.nosebs.ru','https://pipedapi.adminforge.de','https://api.piped.private.coffee','https://pipedapi.orangenet.cc'];
 
 const $=s=>document.querySelector(s);
 const LS={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
-let key=LS.get('key','')||BUILT_IN_KEY,pi=0,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},fails=0;
+let key=LS.get('key','')||BUILT_IN_KEY,pi=0,player,ready=0,cur=null,pend=null,results=[],next=[],seen=new Set(),hist=[],tab='res',lib={},fails=0,drag=0;
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const fmt=s=>s?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'';
+const fmt=s=>s>=0?(s/60|0)+':'+String(s%60|0).padStart(2,'0'):'0:00';
 const dec=s=>{const e=document.createElement('textarea');e.innerHTML=s;return e.value};
 
-/* ---- turn YouTube titles into song + artist ---- */
-const JUNK=/\s*[\(\[][^\)\]]*(official|audio|lyric|video|visuali[sz]er|remaster)[^\)\]]*[\)\]]/ig;
+/* ---- clean YouTube titles into song + artist ---- */
+const JUNK=/\s*[\(\[][^\)\]]*(official|audio|lyric|video|visuali[sz]er|remaster|hd|4k)[^\)\]]*[\)\]]/ig;
 function tidy(title,up){
   let a=(up||'').replace(/\s*-\s*Topic$|VEVO$/i,'').trim(),t=(title||'').replace(JUNK,'').trim();
   const k=t.indexOf(' - ');
@@ -92,8 +117,9 @@ function tidy(title,up){
 const vidOf=u=>(u.match(/[?&]v=([\w-]{11})/)||[])[1];
 const mk=(id,title,up,dur)=>({id,...tidy(title,up),duration:dur||null,thumb:`https://i.ytimg.com/vi/${id}/mqdefault.jpg`});
 const fromPiped=i=>mk(vidOf(i.url),i.title,i.uploaderName,i.duration);
+const isSong=i=>vidOf(i.url||'')&&(!i.duration||(i.duration>=45&&i.duration<=720));
 
-/* ---- search: keyless via public Piped servers, or the YouTube Data API if a key is set ---- */
+/* ---- music-focused search ---- */
 async function piped(path){
   for(let n=0;n<PIPED.length;n++){
     const idx=(pi+n)%PIPED.length,c=new AbortController(),tm=setTimeout(()=>c.abort(),7000);
@@ -113,34 +139,45 @@ async function search(q){
     if(!r.ok)throw Error(d.error?.message||'YouTube API error '+r.status);
     return d.items.map(i=>mk(i.id.videoId,dec(i.snippet.title),dec(i.snippet.channelTitle)));
   }
-  const e=encodeURIComponent(q),ok=d=>(d.items||[]).filter(i=>vidOf(i.url||''));
-  // Prefer standard videos over music_songs to avoid label-blocked Topic tracks
-  let it=ok(await piped('/search?q='+e+'&filter=videos'));
-  if(!it.length)it=ok(await piped('/search?q='+e+'&filter=music_songs'));
-  return it.map(fromPiped);
+  // Query official music songs + embeddable audio uploads in parallel
+  const [songsRes,audioRes]=await Promise.allSettled([
+    piped('/search?q='+encodeURIComponent(q)+'&filter=music_songs'),
+    piped('/search?q='+encodeURIComponent(q+' audio')+'&filter=videos')
+  ]);
+  const out=[],ids=new Set();
+  for(const res of [songsRes,audioRes]){
+    if(res.status!=='fulfilled')continue;
+    for(const item of (res.value.items||[]).filter(isSong)){
+      const t=fromPiped(item);
+      if(t.id&&!ids.has(t.id)){ids.add(t.id);out.push(t);}
+    }
+  }
+  if(!out.length)throw Error('No music tracks found or search servers are busy.');
+  return out;
 }
 async function related(t){
   if(!key){
     try{
       const d=await piped('/streams/'+t.id);
-      return d.relatedStreams.filter(i=>vidOf(i.url||'')&&i.duration>0&&i.duration<=720).map(fromPiped);
+      return (d.relatedStreams||[]).filter(isSong).map(fromPiped);
     }catch{}
   }
-  return search(t.artist+' songs');
+  return search(t.artist);
 }
 
 /* ---- UI ---- */
-const row=t=>`<div class="row" data-id="${t.id}"><img src="${t.thumb}" alt=""><div><b>${esc(t.title)}</b><small>${esc(t.artist)}${t.duration?' · '+fmt(t.duration):''}</small></div></div>`;
+const row=t=>`<div class="row" data-id="${t.id}"><img src="${t.thumb}" alt=""><div><b>${esc(t.title)}</b><small>${esc(t.artist)}</small></div><small>${t.duration?fmt(t.duration):''}</small></div>`;
 function draw(){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
   const L=tab=='res'?results:next;
-  $('#ls').innerHTML=L.length?L.map(row).join(''):'<p class="msg">'+(tab=='res'?'Search above to start.':'Suggestions appear once a song is playing.')+'</p>';
+  $('#ls').innerHTML=L.length?L.map(row).join(''):'<p class="msg">'+(tab=='res'?'Search a song or artist to start.':'Up next queue fills automatically once a song plays.')+'</p>';
 }
-const meta=t=>{$('#mt').textContent=[t.artist,fmt(t.duration)].filter(Boolean).join(' · ')};
+const meta=t=>{$('#mt').textContent=t.artist;$('#t1').textContent=fmt(t.duration||0)};
 function play(t,back){
   if(cur&&!back)hist.push(cur);
   cur=t;seen.add(t.id);$('#st').textContent='';
-  $('#hero').hidden=false;$('#art').src=t.thumb;$('#tt').textContent=t.title;meta(t);document.title=t.title;
+  $('#deck').hidden=false;$('#art').src=t.thumb;$('#tt').textContent=t.title;$('#t0').textContent='0:00';$('#seek').value=0;
+  meta(t);document.title=t.title+' · '+t.artist;
   if(ready)player.loadVideoById(t.id);else pend=t;
   if('mediaSession' in navigator)navigator.mediaSession.metadata=new MediaMetadata({title:t.title,artist:t.artist,artwork:[{src:t.thumb}]});
   related(t).then(r=>{r.forEach(x=>lib[x.id]=x);next=r.filter(x=>!seen.has(x.id));draw()}).catch(()=>{});
@@ -150,19 +187,16 @@ const skip=(bad,code)=>{
   const n=L.find(x=>!seen.has(x.id));
   if(n){
     play(n);
-    if(bad===true)$('#st').textContent=`That video can’t be embedded (Error ${code||'152'}), skipped to the next one.`;
+    if(bad===true)$('#st').textContent='Label blocked embed on that version — switched to an playable audio upload.';
   }else if(bad===true){
-    $('#st').textContent='No embeddable tracks left in this list. Try another search.';
+    $('#st').textContent='No embeddable versions left for that search.';
   }
 };
 
 window.onYouTubeIframeAPIReady=()=>{
-  const pv={playsinline:1,rel:0,enablejsapi:1};
-  if(location.origin.startsWith('http')){
-    pv.origin=location.origin;
-    pv.widget_referrer=location.href;
-  }
-  player=new YT.Player('yt',{width:'100%',height:'100%',playerVars:pv,events:{
+  const pv={playsinline:1,rel:0,enablejsapi:1,controls:0,disablekb:1};
+  if(location.origin.startsWith('http')){pv.origin=location.origin;pv.widget_referrer=location.href;}
+  player=new YT.Player('yt',{width:'200',height:'200',playerVars:pv,events:{
     onReady(){
       const ifr=player.getIframe?.();
       if(ifr)ifr.referrerPolicy='strict-origin-when-cross-origin';
@@ -173,14 +207,15 @@ window.onYouTubeIframeAPIReady=()=>{
       $('#pp').textContent=e.data==1?'⏸':'▶';
       if(e.data==1){
         fails=0;
-        if(cur&&!cur.duration){cur.duration=player.getDuration()|0;meta(cur)}
+        const d=player.getDuration()|0;
+        if(cur&&d){cur.duration=d;meta(cur)}
       }
       if(e.data==0)skip();
     },
     onError(e){
       fails++;
-      if(fails>=3){
-        $('#st').textContent=`YouTube blocked playback (Error ${e.data}). Serve this page over http://localhost or HTTPS and disable extensions that strip Referer headers.`;
+      if(fails>=4){
+        $('#st').textContent=`Playback blocked (Error ${e.data}). Run on http://localhost or HTTPS and disable Referer-blocking extensions.`;
         return;
       }
       skip(true,e.data);
@@ -189,13 +224,23 @@ window.onYouTubeIframeAPIReady=()=>{
 };
 const ys=document.createElement('script');ys.src='https://www.youtube.com/iframe_api';document.head.append(ys);
 
+/* ---- scrubber & volume ---- */
+setInterval(()=>{
+  if(!ready||drag||player.getPlayerState?.()!==1)return;
+  const c=player.getCurrentTime()||0,d=player.getDuration()||0;
+  if(d>0){$('#seek').value=Math.round((c/d)*1000);$('#t0').textContent=fmt(c);$('#t1').textContent=fmt(d);}
+},300);
+$('#seek').oninput=()=>{drag=1;const d=ready?(player.getDuration()||0):0;$('#t0').textContent=fmt(($('#seek').value/1000)*d)};
+$('#seek').onchange=()=>{if(ready){const d=player.getDuration()||0;player.seekTo(($('#seek').value/1000)*d,true)}drag=0};
+$('#vol').oninput=()=>{if(!ready)return;player.unMute();player.setVolume(+$('#vol').value);$('#mut').textContent=+$('#vol').value===0?'🔇':'🔊'};
+$('#mut').onclick=()=>{if(!ready)return;if(player.isMuted()){player.unMute();$('#mut').textContent='🔊'}else{player.mute();$('#mut').textContent='🔇'}};
+
 $('#f').onsubmit=async e=>{
   e.preventDefault();const q=$('#q').value.trim();if(!q)return;
-  fails=0;seen.clear();
-  $('#st').textContent='Searching…';
+  fails=0;seen.clear();$('#st').textContent='Finding tracks…';
   try{
     results=await search(q);results.forEach(x=>lib[x.id]=x);
-    tab='res';draw();$('#st').textContent=results.length?'':'No results.';
+    tab='res';draw();$('#st').textContent='';
     if(results[0])play(results[0]);
   }catch(x){$('#st').textContent=x.message}
 };
@@ -205,13 +250,13 @@ $('#pp').onclick=()=>ready&&(player.getPlayerState()==1?player.pauseVideo():play
 $('#nt').onclick=()=>{fails=0;skip()};
 $('#pv').onclick=()=>{if(!ready)return;if(player.getCurrentTime()>3||!hist.length)player.seekTo(0);else play(hist.pop(),true)};
 $('#gear').onclick=()=>$('#set').hidden=!$('#set').hidden;
-$('#ks').onclick=e=>{e.preventDefault();key=$('#key').value.trim()||BUILT_IN_KEY;LS.set('key',$('#key').value.trim());$('#set').hidden=true;$('#st').textContent=key?'Using your YouTube API key for search.':'Using keyless search.'};
+$('#ks').onclick=e=>{e.preventDefault();key=$('#key').value.trim()||BUILT_IN_KEY;LS.set('key',$('#key').value.trim());$('#set').hidden=true;$('#st').textContent=key?'Using your YouTube API key for music search.':'Using keyless music search.'};
 if('mediaSession' in navigator){
   navigator.mediaSession.setActionHandler('nexttrack',()=>{fails=0;skip()});
   navigator.mediaSession.setActionHandler('play',()=>player.playVideo());
   navigator.mediaSession.setActionHandler('pause',()=>player.pauseVideo());
 }
-if(location.protocol=='file:')$('#st').textContent='YouTube blocks embeds on file:// pages. Serve this locally (e.g. npx serve or python -m http.server) or upload to a web host.';
+if(location.protocol=='file:')$('#st').textContent='Serve this page over http://localhost or HTTPS so YouTube allows embeds.';
 draw();
 </script>
 </body>
